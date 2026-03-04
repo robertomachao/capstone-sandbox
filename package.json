@@ -1,0 +1,25 @@
+{
+  "name": "futurescape-exhibition",
+  "version": "1.0.0",
+  "description": "Capstone Project - Exhibition : FutureScape - 4-screen interactive installation",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "nodemon server/server.js"
+  },
+  "keywords": [
+    "p5js",
+    "exhibition",
+    "socket.io",
+    "multiscreen"
+  ],
+  "author": "Roberto Cunha",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.6.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FutureScape - Display Screen</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.js"></script>
+    <script src="display.js"></script>
+</head>
+<body>
+    <div id="screen-config">
+        <h2>Screen Configuration</h2>
+        <p>Select which screen this is:</p>
+        <button id="btn-screen2" onclick="setScreenId('screen2')">Screen 2 (Left)</button>
+        <button id="btn-screen3" onclick="setScreenId('screen3')">Screen 3 (Middle)</button>
+        <button id="btn-screen4" onclick="setScreenId('screen4')">Screen 4 (Right)</button>
+        <p id="status">Not configured</p>
+    </div>
+    <div id="p5-container" style="display: none;"></div>
+</body>
+</html>
