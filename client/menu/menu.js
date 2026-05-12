@@ -36,7 +36,9 @@ const INPUT_DEBOUNCE_MS = 350;
 let lastInputEventMs = 0;
 
 function setup() {
-  createCanvas(3840, 2160);
+  // Match the visible window — a fixed 4K canvas was mostly off-screen on laptops (black view).
+  const cnv = createCanvas(windowWidth, windowHeight);
+  cnv.parent('p5-container');
 
   socket = io();
 
@@ -85,6 +87,10 @@ function setup() {
     console.log('Disconnected from server');
     connected = false;
   });
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
 }
 
 function draw() {

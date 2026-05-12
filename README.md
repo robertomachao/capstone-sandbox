@@ -28,9 +28,11 @@ Full spec: [Planning.md](Planning.md).
 
 4. **Open Chrome** (four tabs on the same machine)
 
-   - Menu: `http://127.0.0.1:3000/menu`  
-   - Display (open **three** times): `http://127.0.0.1:3000/display`  
-     On each display tab, choose **Screen 2 (Left)**, **Screen 3 (Middle)**, or **Screen 4 (Right)** exactly once.
+   - **Menu (Screen 1)** — this is where buttons live: `http://127.0.0.1:3000/menu`  
+   - **Display** (open **three** times): `http://127.0.0.1:3000/display`  
+     On each tab, pick **Left**, **Middle**, or **Right** once (three different tabs).
+
+   **Using the menu:** the first screen is **Idle** (short prompt on black). **Click or tap anywhere** once to open the **Main Menu** — then you see the four **Location** buttons. The three display tabs stay **plain black** until you choose a location and images exist under `assets/images/` (that is normal).
 
 5. **Smoke tests**
 
@@ -41,6 +43,13 @@ Full spec: [Planning.md](Planning.md).
 **Offline show:** P5 is served from `client/vendor/p5.min.js` (no CDN). After `npm install`, the runtime does not need internet.
 
 **Start the server before opening the menu tab** so `preload()` can load `/api/asset-manifest`.
+
+## Troubleshooting: all black, no buttons
+
+- Use the **menu** URL (`/menu`), not only `/display`. Display clients intentionally show black until content loads.
+- **Tap or click the menu once** on the idle screen to reveal the Location buttons (idle → main menu).
+- Open DevTools (F12) → **Console** on the menu tab: red errors often mean the server was not running when the tab loaded, or Socket.io failed to connect — refresh after `npm start`.
+- **Do not open the menu as a local file** (`file://…`); always use `http://127.0.0.1:3000/menu` so scripts and `/api/asset-manifest` load.
 
 ## Menu behavior (Phases 2–3)
 

@@ -86,7 +86,12 @@ function connectToServer() {
 }
 
 function setup() {
-  createCanvas(3840, 2160);
+  const cnv = createCanvas(windowWidth, windowHeight);
+  cnv.parent('p5-container');
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
 }
 
 function draw() {
