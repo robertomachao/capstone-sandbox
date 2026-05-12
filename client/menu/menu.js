@@ -6,6 +6,11 @@ let connected = false;
 /** Last roster from server (Phase 1 smoke-test HUD) */
 let roster = null;
 
+/** Phase 2: inactivity → Idle (Planning: 20s, cancellable on transition) */
+const MENU_INACTIVITY_MS = 20000;
+/** If clients never become ready, escape loading (exhibition safety) */
+const LOADING_STALL_MS = 120000;
+
 const STATES = {
   IDLE: 'idle',
   MAIN_MENU: 'main_menu',
@@ -18,6 +23,11 @@ let currentState = STATES.IDLE;
 /** After LOAD_IMAGE + all READY: where to go next */
 let loadingDestination = null;
 let imageExhibitStartMs = 0;
+let lastInteractionMs = 0;
+let loadingEnteredMs = 0;
+/** Ignore duplicate touch + mouse within this window (ms) */
+const INPUT_DEBOUNCE_MS = 350;
+let lastInputEventMs = 0;
 
 function setup() {
   createCanvas(3840, 2160);
@@ -48,6 +58,7 @@ function setup() {
       imageExhibitStartMs = millis();
     }
     loadingDestination = null;
+    bumpInteraction();
   });
 
   socket.on('disconnect', () => {
@@ -77,10 +88,11 @@ function draw() {
       break;
   }
 
-  drawPhase1RosterHud();
+  drawRosterHud();
+  checkMenuTimeouts();
 }
 
-function drawPhase1RosterHud() {
+function drawRosterHud() {
   if (!roster) return;
   push();
   textAlign(RIGHT, TOP);
@@ -89,8 +101,43 @@ function drawPhase1RosterHud() {
   const L = roster.screen2 ? 'L:OK' : 'L:--';
   const M = roster.screen3 ? 'M:OK' : 'M:--';
   const R = roster.screen4 ? 'R:OK' : 'R:--';
-  text(`Phase 1 | ${L} ${M} ${R}`, width - 24, 24);
+  text(`Phase 2 | ${L} ${M} ${R}`, width - 24, 24);
   pop();
+}
+
+function bumpInteraction() {
+  lastInteractionMs = millis();
+}
+
+function goToIdle() {
+  emitIdleToDisplays();
+  currentState = STATES.IDLE;
+  loadingDestination = null;
+  bumpInteraction();
+}
+
+function enterLoading(destination) {
+  loadingDestination = destination;
+  currentState = STATES.LOADING;
+  loadingEnteredMs = millis();
+}
+
+function checkMenuTimeouts() {
+  if (currentState === STATES.LOADING) {
+    if (millis() - loadingEnteredMs >= LOADING_STALL_MS) {
+      goToIdle();
+    }
+    return;
+  }
+
+  if (
+    currentState === STATES.MAIN_MENU ||
+    currentState === STATES.PHOTO_SELECTION
+  ) {
+    if (millis() - lastInteractionMs >= MENU_INACTIVITY_MS) {
+      goToIdle();
+    }
+  }
 }
 
 function drawIdleState() {
@@ -209,9 +256,29 @@ function emitIdleToDisplays() {
   }
 }
 
+function touchStarted() {
+  handleMenuInput();
+  return false;
+}
+
 function mousePressed() {
+  handleMenuInput();
+}
+
+function handleMenuInput() {
+  const now = millis();
+  if (now - lastInputEventMs < INPUT_DEBOUNCE_MS) {
+    return;
+  }
+  lastInputEventMs = now;
+
+  if (currentState === STATES.MAIN_MENU || currentState === STATES.PHOTO_SELECTION) {
+    bumpInteraction();
+  }
+
   if (currentState === STATES.IDLE) {
     currentState = STATES.MAIN_MENU;
+    bumpInteraction();
   } else if (currentState === STATES.MAIN_MENU) {
     const buttons = [
       { text: 'Location 1', x: width / 2, y: height / 2 - 200 },
@@ -227,8 +294,7 @@ function mousePressed() {
         mouseY > button.y - 60 &&
         mouseY < button.y + 60
       ) {
-        loadingDestination = 'photo_selection';
-        currentState = STATES.LOADING;
+        enterLoading('photo_selection');
         if (socket && connected) {
           socket.emit('load-image', pathsForLocation(index));
         }
@@ -252,15 +318,14 @@ function mousePressed() {
         if (button.action === 'back') {
           emitIdleToDisplays();
           currentState = STATES.MAIN_MENU;
+          bumpInteraction();
         } else if (button.action === 'choice1') {
-          loadingDestination = 'image_exhibit';
-          currentState = STATES.LOADING;
+          enterLoading('image_exhibit');
           if (socket && connected) {
             socket.emit('load-image', pathsForChoice(1));
           }
         } else if (button.action === 'choice2') {
-          loadingDestination = 'image_exhibit';
-          currentState = STATES.LOADING;
+          enterLoading('image_exhibit');
           if (socket && connected) {
             socket.emit('load-image', pathsForChoice(2));
           }
@@ -274,6 +339,7 @@ function mousePressed() {
       if (mouseX > bx - 180 && mouseX < bx + 180 && mouseY > by - 40 && mouseY < by + 40) {
         emitIdleToDisplays();
         currentState = STATES.MAIN_MENU;
+        bumpInteraction();
       }
     }
   }

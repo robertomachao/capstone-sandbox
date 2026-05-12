@@ -195,8 +195,12 @@ capstone-sandbox-1/
 - **Verify layout:** `npm run phase1:check` (with server up: `PHASE1_PROBE=1 npm run phase1:check` to hit **`GET /api/health`**).
 - **Live roster:** Menu shows **Phase 1 | L:OK M:OK R:OK** (top right) when each display socket is registered.
 
-### Phase 2: Menu system
-- Screen 1 state machine, timeouts, navigation
+### Phase 2: Menu system — **deployed**
+- Screen 1 **state machine** (idle → main menu → loading → photo selection → image exhibit) with **navigation** as before
+- **20s inactivity** on Main Menu and Photo Selection returns to **Idle** (clears displays via `idle`); timer **resets** on any tap in those states (including non-button areas)
+- **Touch:** `touchStarted()` forwards to the same handler as mouse (debounced to avoid double fire with mouse events)
+- **Loading stall:** if clients never report ready within **120s**, menu returns to **Idle** so the UI cannot hang indefinitely
+- **HUD:** menu shows **Phase 2 | L/M/R** connection line (same as Phase 1 roster)
 
 ### Phase 3: Image pipeline
 - **LOAD_IMAGE** path map, **READY** / **display**, triptych on three tabs at once, loading UI

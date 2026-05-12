@@ -34,11 +34,21 @@ Full spec: [Planning.md](Planning.md).
 
 5. **Smoke tests**
 
-   - **HTTP:** `http://127.0.0.1:3000/api/health` — JSON shows which sockets are connected (`menu`, `screen2`, `screen3`, `screen4`).  
+   - **HTTP:** `http://127.0.0.1:3000/api/health` — JSON includes `phase` (milestone), `menu`, `screen2`, `screen3`, `screen4`.  
    - **With server running:** `PHASE1_PROBE=1 npm run phase1:check`  
-   - **Menu HUD:** After the menu connects, the top-right shows `Phase 1 | L:OK M:OK R:OK` as each display registers.
+   - **Menu HUD:** Top-right shows **`Phase 2 | L:OK M:OK R:OK`** when displays register (connection roster).
 
 **Offline show:** P5 is served from `client/vendor/p5.min.js` (no CDN). After `npm install`, the runtime does not need internet.
+
+## Phase 2 — menu behavior (no extra install)
+
+Already included when you run Phase 1 steps above.
+
+- **20 second timeout:** On **Main Menu** or **Photo Selection**, if nobody touches the menu for 20 seconds, the app returns to the **Idle** screen and sends **`idle`** to the three display tabs (same as Phase 1 wiring).
+- **Touch:** The menu responds to **`touchStarted`** as well as mouse clicks (with a short debounce so one tap does not double-trigger).
+- **Loading safety:** If a load never finishes (missing assets or disconnected clients), after **120 seconds** the menu returns to **Idle**.
+
+Nothing else is required to “turn on” Phase 2 beyond `npm start` and refreshing the menu tab after you pull the latest code.
 
 ## Project layout
 
@@ -59,4 +69,4 @@ npm run dev
 
 ## Next phases
 
-See **Development phases** in [Planning.md](Planning.md): Phase 2 (menu timeouts / polish), Phase 3 (image pipeline hardening), Phase 4 (fades & errors), Phase 5 (ambisonics).
+See [Planning.md](Planning.md): **Phase 3** (image pipeline hardening), **Phase 4** (fades & errors), **Phase 5** (ambisonics).

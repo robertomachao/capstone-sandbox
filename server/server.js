@@ -49,11 +49,11 @@ function emitRosterToMenu() {
   }
 }
 
-// Phase 1: HTTP smoke check (curl / browser) — no WebSocket required
+// HTTP smoke check (curl / browser) — no WebSocket required
 app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
-    phase: 1,
+    phase: 2,
     service: 'futurescape',
     ...rosterPayload()
   });

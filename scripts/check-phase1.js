@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Phase 1 offline checks: required files and optional live /api/health probe.
- * Usage: node scripts/check-phase1.js
- * With server running: PHASE1_PROBE=1 node scripts/check-phase1.js
+ * Stack checks: required files and optional live /api/health probe.
+ * Usage: npm run phase1:check
+ * With server running: PHASE1_PROBE=1 npm run phase1:check
  */
 
 const fs = require('fs');
@@ -40,7 +40,7 @@ if (failed) {
   process.exit(1);
 }
 
-console.log('Phase 1 file layout: OK');
+console.log('Project file layout: OK');
 
 if (process.env.PHASE1_PROBE === '1') {
   const port = process.env.PORT || 3000;
@@ -50,7 +50,7 @@ if (process.env.PHASE1_PROBE === '1') {
     res.on('end', () => {
       try {
         const j = JSON.parse(body);
-        if (!j.ok || j.phase !== 1) {
+        if (!j.ok || typeof j.phase !== 'number' || j.phase < 1) {
           console.error('Unexpected health payload:', body);
           process.exit(1);
         }
