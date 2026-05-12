@@ -44,19 +44,30 @@ A 4-screen interactive exhibition installation where Screen 1 serves as a touch-
 
 ### State 2: Main Menu
 - **Layout:**
-  - **Top left:** “Welcome to FutureScape, where the future is a choice away”
-  - **Bottom right:** “by Roberto Cunha” + logo (to be provided)
-  - **Center:** At least **4** buttons (placeholder labels) — each selects a **location / image set**
-- **Interaction:** Button → start pre-load on display tabs → **Loading** → when all ready → **Photo Selection**
-- **Timeout:** 20 seconds inactivity → Idle
+  - **Top:** welcome line (top left) + **by Roberto Cunha** (bottom right) + logo (to be provided)
+  - **Center — exactly 3 buttons:**
+    1. **Instructions** → **Instructions** screen (copy is editable in `menu.js`)
+    2. **Choose location** → **Location select** screen with **Location 1–4** + **Back to Menu**
+    3. **Close** → **Goodbye** message, then tap → **Idle** (displays receive **`idle`**)
+- **Interaction:** After **Choose location** → pick a location → **Loading** → **Photo Selection** when ready (unchanged pipeline)
+- **Timeout:** 20 seconds inactivity → Idle (also applies to Instructions, Location select, Photo selection, Goodbye)
+
+### State 2b: Instructions (from Main Menu)
+- Scroll-style copy + **Back to Menu**
+
+### State 2c: Location select (from Main Menu → Choose location)
+- **Location 1–4** → **Loading** → **Photo Selection**; **Back to Menu** clears displays and returns to Main Menu
+
+### State 2d: Goodbye (from Main Menu → Close)
+- Farewell copy (editable in `menu.js`); tap returns to **Idle**
 
 ### State 3: Loading State
 - **Display:** Rotating gauge / progress-style indicator while Screens 2–4 **pre-load** their image portions
 - **Transition:** When all three clients confirm **READY** → next state depends on flow (**Photo Selection** after main menu choice, or **Image exhibit** after a secondary choice)
 
 ### State 4: Photo Selection State
-- **Display:** Same layout idea as Main Menu; **3** buttons:
-  1. “Back to Main Menu”
+- **Display:** **3** buttons:
+  1. “Back to Menu”
   2. “Choice 1” — pre-loads **image set A** (three files) on clients
   3. “Choice 2” — pre-loads **image set B** (three files) on clients
 - **Interaction:**

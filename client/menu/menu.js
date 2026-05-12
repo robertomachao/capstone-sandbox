@@ -3,40 +3,52 @@
 
 let socket;
 let connected = false;
-/** Last roster from server (Phase 1 smoke-test HUD) */
 let roster = null;
-/** Triptych paths from server (Phase 3); fallback if request fails */
 let assetManifest = null;
 
 function preload() {
   assetManifest = loadJSON('/api/asset-manifest');
 }
 
-/** Phase 2: inactivity → Idle (Planning: 20s, cancellable on transition) */
 const MENU_INACTIVITY_MS = 20000;
-/** If clients never become ready, escape loading (exhibition safety) */
 const LOADING_STALL_MS = 120000;
 
 const STATES = {
   IDLE: 'idle',
   MAIN_MENU: 'main_menu',
+  INSTRUCTIONS: 'instructions',
+  LOCATION_SELECT: 'location_select',
   LOADING: 'loading',
   PHOTO_SELECTION: 'photo_selection',
-  IMAGE_EXHIBIT: 'image_exhibit'
+  IMAGE_EXHIBIT: 'image_exhibit',
+  GOODBYE: 'goodbye'
 };
 
 let currentState = STATES.IDLE;
-/** After LOAD_IMAGE + all READY: where to go next */
 let loadingDestination = null;
 let imageExhibitStartMs = 0;
 let lastInteractionMs = 0;
 let loadingEnteredMs = 0;
-/** Ignore duplicate touch + mouse within this window (ms) */
 const INPUT_DEBOUNCE_MS = 350;
 let lastInputEventMs = 0;
+/** After goodbye, allow tap to dismiss to idle */
+let goodbyeShownMs = 0;
+
+/** Copy — edit anytime */
+const INSTRUCTION_LINES = [
+  'Welcome to FutureScape.',
+  'Tap “Choose location” to explore pre-split scenes on the three display screens.',
+  'Each wall shows one third of the image — left, middle, and right.',
+  'Use “Close” when you are finished to see a farewell message.'
+];
+
+const GOODBYE_LINES = [
+  'Thank you for visiting FutureScape.',
+  'We hope the future feels a little closer.',
+  '— Roberto Cunha'
+];
 
 function setup() {
-  // Match the visible window — a fixed 4K canvas was mostly off-screen on laptops (black view).
   const cnv = createCanvas(windowWidth, windowHeight);
   cnv.parent('p5-container');
 
@@ -64,6 +76,8 @@ function setup() {
     emitIdleToDisplays();
     if (dest === 'image_exhibit') {
       currentState = STATES.PHOTO_SELECTION;
+    } else if (dest === 'photo_selection') {
+      currentState = STATES.LOCATION_SELECT;
     } else {
       currentState = STATES.MAIN_MENU;
     }
@@ -103,6 +117,12 @@ function draw() {
     case STATES.MAIN_MENU:
       drawMainMenu();
       break;
+    case STATES.INSTRUCTIONS:
+      drawInstructions();
+      break;
+    case STATES.LOCATION_SELECT:
+      drawLocationSelect();
+      break;
     case STATES.LOADING:
       drawLoadingState();
       break;
@@ -111,6 +131,9 @@ function draw() {
       break;
     case STATES.IMAGE_EXHIBIT:
       drawImageExhibit();
+      break;
+    case STATES.GOODBYE:
+      drawGoodbye();
       break;
   }
 
@@ -122,7 +145,7 @@ function drawRosterHud() {
   if (!roster) return;
   push();
   textAlign(RIGHT, TOP);
-  textSize(28);
+  textSize(min(28, width / 48));
   fill(connected ? color(0, 180, 80) : color(180, 60, 60));
   const L = roster.screen2 ? 'L:OK' : 'L:--';
   const M = roster.screen3 ? 'M:OK' : 'M:--';
@@ -156,41 +179,119 @@ function checkMenuTimeouts() {
     return;
   }
 
-  if (
-    currentState === STATES.MAIN_MENU ||
-    currentState === STATES.PHOTO_SELECTION
-  ) {
+  const timeoutStates = [
+    STATES.MAIN_MENU,
+    STATES.INSTRUCTIONS,
+    STATES.LOCATION_SELECT,
+    STATES.PHOTO_SELECTION,
+    STATES.GOODBYE
+  ];
+  if (timeoutStates.includes(currentState)) {
     if (millis() - lastInteractionMs >= MENU_INACTIVITY_MS) {
       goToIdle();
     }
   }
 }
 
+function drawBrandingHeader() {
+  fill(255);
+  textAlign(LEFT, TOP);
+  textSize(min(48, width / 28));
+  text('Welcome to FutureScape, where the future is a choice away', 24, 24);
+
+  textAlign(RIGHT, BOTTOM);
+  textSize(min(36, width / 36));
+  text('by Roberto Cunha', width - 24, height - 24);
+}
+
 function drawIdleState() {
   background(0);
   fill(255);
   textAlign(CENTER, CENTER);
-  textSize(72);
+  textSize(min(56, width / 22));
   text('Please press anywhere in the screen to open Menu', width / 2, height / 2);
+}
+
+function layoutThreeMainButtons() {
+  const bw = min(560, width * 0.85);
+  const bh = min(100, height * 0.11);
+  const cx = width / 2;
+  const gap = bh + 18;
+  const total = gap * 2;
+  const top = height / 2 - total / 2;
+  return [
+    { text: 'Instructions', x: cx, y: top, w: bw, h: bh, action: 'instructions' },
+    { text: 'Choose location', x: cx, y: top + gap, w: bw, h: bh, action: 'location' },
+    { text: 'Close', x: cx, y: top + gap * 2, w: bw, h: bh, action: 'close' }
+  ];
 }
 
 function drawMainMenu() {
   background(0);
-  fill(255);
-  textAlign(LEFT, TOP);
-  textSize(64);
-  text('Welcome to FutureScape, where the future is a choice away', 50, 50);
+  drawBrandingHeader();
+  drawButtonRow(layoutThreeMainButtons());
+}
 
-  textAlign(RIGHT, BOTTOM);
-  textSize(48);
-  text('by Roberto Cunha', width - 50, height - 50);
+function drawInstructions() {
+  background(0);
+  drawBrandingHeader();
 
-  drawButtons([
-    { text: 'Location 1', x: width / 2, y: height / 2 - 200 },
-    { text: 'Location 2', x: width / 2, y: height / 2 - 50 },
-    { text: 'Location 3', x: width / 2, y: height / 2 + 100 },
-    { text: 'Location 4', x: width / 2, y: height / 2 + 250 }
+  fill(220);
+  textAlign(CENTER, TOP);
+  textSize(min(34, width / 28));
+  let y = height * 0.22;
+  const lh = min(46, height / 26);
+  INSTRUCTION_LINES.forEach((line) => {
+    text(line, width / 2, y);
+    y += lh * 1.55;
+  });
+
+  const bw = min(480, width * 0.75);
+  const bh = min(88, height * 0.1);
+  drawButtonRow([
+    {
+      text: 'Back to Menu',
+      x: width / 2,
+      y: height - min(140, height * 0.18),
+      w: bw,
+      h: bh,
+      action: 'back'
+    }
   ]);
+}
+
+function layoutLocationButtons() {
+  const bw = min(520, width * 0.82);
+  const bh = min(88, height * 0.095);
+  const cx = width / 2;
+  const gap = bh + 14;
+  const top = height * 0.38;
+  return [
+    { text: 'Location 1', x: cx, y: top, w: bw, h: bh, index: 0 },
+    { text: 'Location 2', x: cx, y: top + gap, w: bw, h: bh, index: 1 },
+    { text: 'Location 3', x: cx, y: top + gap * 2, w: bw, h: bh, index: 2 },
+    { text: 'Location 4', x: cx, y: top + gap * 3, w: bw, h: bh, index: 3 },
+    {
+      text: 'Back to Menu',
+      x: cx,
+      y: top + gap * 4 + 24,
+      w: bw,
+      h: bh,
+      action: 'back_menu'
+    }
+  ];
+}
+
+function drawLocationSelect() {
+  background(0);
+  drawBrandingHeader();
+
+  fill(255);
+  textAlign(CENTER, TOP);
+  textSize(min(40, width / 26));
+  text('Choose a location', width / 2, height * 0.26);
+
+  drawButtonRow(layoutLocationButtons());
 }
 
 function drawLoadingState() {
@@ -206,25 +307,35 @@ function drawLoadingState() {
 
   fill(255);
   textAlign(CENTER, CENTER);
-  textSize(64);
-  text('Loading...', width / 2, height / 2 + 150);
+  textSize(min(52, width / 24));
+  text('Loading...', width / 2, height / 2 + 120);
 }
 
 function drawPhotoSelection() {
   background(0);
+  drawBrandingHeader();
+
   fill(255);
-  textAlign(LEFT, TOP);
-  textSize(64);
-  text('Welcome to FutureScape, where the future is a choice away', 50, 50);
+  textAlign(CENTER, TOP);
+  textSize(min(38, width / 28));
+  text('Make a choice', width / 2, height * 0.26);
 
-  textAlign(RIGHT, BOTTOM);
-  textSize(48);
-  text('by Roberto Cunha', width - 50, height - 50);
-
-  drawButtons([
-    { text: 'Back to Main Menu', x: width / 2, y: height / 2 - 100 },
-    { text: 'Choice 1', x: width / 2, y: height / 2 + 50 },
-    { text: 'Choice 2', x: width / 2, y: height / 2 + 200 }
+  const bw = min(520, width * 0.82);
+  const bh = min(88, height * 0.095);
+  const cx = width / 2;
+  const gap = bh + 14;
+  const top = height * 0.38;
+  drawButtonRow([
+    {
+      text: 'Back to Menu',
+      x: cx,
+      y: top,
+      w: bw,
+      h: bh,
+      action: 'back_main'
+    },
+    { text: 'Choice 1', x: cx, y: top + gap, w: bw, h: bh, action: 'choice1' },
+    { text: 'Choice 2', x: cx, y: top + gap * 2, w: bw, h: bh, action: 'choice2' }
   ]);
 }
 
@@ -232,32 +343,65 @@ function drawImageExhibit() {
   background(0);
   fill(255);
   textAlign(CENTER, CENTER);
-  textSize(72);
+  textSize(min(56, width / 22));
   text('Temporary message text', width / 2, height / 2);
 
   if (millis() - imageExhibitStartMs > 7000) {
-    fill(50);
-    rectMode(CENTER);
-    rect(width - 200, height - 100, 360, 80, 10);
-    fill(255);
-    textSize(36);
-    text('Back to Main Menu', width - 200, height - 100);
+    const bw = min(360, width * 0.45);
+    const bh = min(72, height * 0.08);
+    drawButtonRow([
+      {
+        text: 'Back to Menu',
+        x: width - 24 - bw / 2,
+        y: height - min(80, height * 0.1),
+        w: bw,
+        h: bh,
+        action: 'back_menu_exhibit'
+      }
+    ]);
   }
 }
 
-function drawButtons(buttons) {
+function drawGoodbye() {
+  background(0);
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(min(44, width / 24));
+  let y = height * 0.38;
+  const lh = min(52, height / 22);
+  GOODBYE_LINES.forEach((line) => {
+    text(line, width / 2, y);
+    y += lh * 1.35;
+  });
+
+  if (millis() - goodbyeShownMs > 1500) {
+    textSize(min(28, width / 32));
+    fill(180);
+    text('Tap anywhere to return to the welcome screen', width / 2, height * 0.72);
+  }
+}
+
+function drawButtonRow(buttons) {
   buttons.forEach((button) => {
     fill(50);
     rectMode(CENTER);
-    rect(button.x, button.y, 600, 120, 10);
+    rect(button.x, button.y, button.w, button.h, 10);
     fill(255);
     textAlign(CENTER, CENTER);
-    textSize(48);
+    textSize(min(44, button.h * 0.42));
     text(button.text, button.x, button.y);
   });
 }
 
-/** Pre-split image paths for main-menu location (0-based index → locations "1"…"4"). */
+function hitRect(mx, my, b) {
+  return (
+    mx > b.x - b.w / 2 &&
+    mx < b.x + b.w / 2 &&
+    my > b.y - b.h / 2 &&
+    my < b.y + b.h / 2
+  );
+}
+
 function pathsForLocation(locationIndex) {
   const k = String(locationIndex + 1);
   const loc =
@@ -277,7 +421,6 @@ function pathsForLocation(locationIndex) {
   };
 }
 
-/** Pre-split paths for secondary choice (1 or 2). */
 function pathsForChoice(choiceNum) {
   const k = String(choiceNum);
   const ch =
@@ -318,71 +461,128 @@ function handleMenuInput() {
   }
   lastInputEventMs = now;
 
-  if (currentState === STATES.MAIN_MENU || currentState === STATES.PHOTO_SELECTION) {
+  const mx = mouseX;
+  const my = mouseY;
+
+  if (
+    currentState === STATES.MAIN_MENU ||
+    currentState === STATES.INSTRUCTIONS ||
+    currentState === STATES.LOCATION_SELECT ||
+    currentState === STATES.PHOTO_SELECTION ||
+    currentState === STATES.GOODBYE
+  ) {
     bumpInteraction();
   }
 
   if (currentState === STATES.IDLE) {
     currentState = STATES.MAIN_MENU;
     bumpInteraction();
-  } else if (currentState === STATES.MAIN_MENU) {
-    const buttons = [
-      { text: 'Location 1', x: width / 2, y: height / 2 - 200 },
-      { text: 'Location 2', x: width / 2, y: height / 2 - 50 },
-      { text: 'Location 3', x: width / 2, y: height / 2 + 100 },
-      { text: 'Location 4', x: width / 2, y: height / 2 + 250 }
-    ];
+    return;
+  }
 
-    buttons.forEach((button, index) => {
-      if (
-        mouseX > button.x - 300 &&
-        mouseX < button.x + 300 &&
-        mouseY > button.y - 60 &&
-        mouseY < button.y + 60
-      ) {
+  if (currentState === STATES.GOODBYE) {
+    if (millis() - goodbyeShownMs > 800) {
+      goToIdle();
+    }
+    return;
+  }
+
+  if (currentState === STATES.MAIN_MENU) {
+    layoutThreeMainButtons().forEach((b) => {
+      if (!hitRect(mx, my, b)) return;
+      if (b.action === 'instructions') {
+        currentState = STATES.INSTRUCTIONS;
+        bumpInteraction();
+      } else if (b.action === 'location') {
+        currentState = STATES.LOCATION_SELECT;
+        bumpInteraction();
+      } else if (b.action === 'close') {
+        emitIdleToDisplays();
+        currentState = STATES.GOODBYE;
+        goodbyeShownMs = millis();
+        bumpInteraction();
+      }
+    });
+    return;
+  }
+
+  if (currentState === STATES.INSTRUCTIONS) {
+    layoutThreeMainButtons();
+    const back = {
+      text: 'Back to Menu',
+      x: width / 2,
+      y: height - min(140, height * 0.18),
+      w: min(480, width * 0.75),
+      h: min(88, height * 0.1)
+    };
+    if (hitRect(mx, my, back)) {
+      currentState = STATES.MAIN_MENU;
+      bumpInteraction();
+    }
+    return;
+  }
+
+  if (currentState === STATES.LOCATION_SELECT) {
+    layoutLocationButtons().forEach((b) => {
+      if (!hitRect(mx, my, b)) return;
+      if (b.action === 'back_menu') {
+        emitIdleToDisplays();
+        currentState = STATES.MAIN_MENU;
+        bumpInteraction();
+      } else if (typeof b.index === 'number') {
         enterLoading('photo_selection');
         if (socket && connected) {
-          socket.emit('load-image', pathsForLocation(index));
+          socket.emit('load-image', pathsForLocation(b.index));
         }
-        console.log(`Location ${index + 1} selected — pre-loading images on display tabs`);
       }
     });
-  } else if (currentState === STATES.PHOTO_SELECTION) {
-    const buttons = [
-      { text: 'Back to Main Menu', x: width / 2, y: height / 2 - 100, action: 'back' },
-      { text: 'Choice 1', x: width / 2, y: height / 2 + 50, action: 'choice1' },
-      { text: 'Choice 2', x: width / 2, y: height / 2 + 200, action: 'choice2' }
-    ];
+    return;
+  }
 
-    buttons.forEach((button) => {
-      if (
-        mouseX > button.x - 300 &&
-        mouseX < button.x + 300 &&
-        mouseY > button.y - 60 &&
-        mouseY < button.y + 60
-      ) {
-        if (button.action === 'back') {
-          emitIdleToDisplays();
-          currentState = STATES.MAIN_MENU;
-          bumpInteraction();
-        } else if (button.action === 'choice1') {
-          enterLoading('image_exhibit');
-          if (socket && connected) {
-            socket.emit('load-image', pathsForChoice(1));
-          }
-        } else if (button.action === 'choice2') {
-          enterLoading('image_exhibit');
-          if (socket && connected) {
-            socket.emit('load-image', pathsForChoice(2));
-          }
+  if (currentState === STATES.PHOTO_SELECTION) {
+    const bw = min(520, width * 0.82);
+    const bh = min(88, height * 0.095);
+    const cx = width / 2;
+    const gap = bh + 14;
+    const top = height * 0.38;
+    const rows = [
+      { text: 'Back to Menu', x: cx, y: top, w: bw, h: bh, action: 'back_main' },
+      { text: 'Choice 1', x: cx, y: top + gap, w: bw, h: bh, action: 'choice1' },
+      { text: 'Choice 2', x: cx, y: top + gap * 2, w: bw, h: bh, action: 'choice2' }
+    ];
+    rows.forEach((b) => {
+      if (!hitRect(mx, my, b)) return;
+      if (b.action === 'back_main') {
+        emitIdleToDisplays();
+        currentState = STATES.MAIN_MENU;
+        bumpInteraction();
+      } else if (b.action === 'choice1') {
+        enterLoading('image_exhibit');
+        if (socket && connected) {
+          socket.emit('load-image', pathsForChoice(1));
+        }
+      } else if (b.action === 'choice2') {
+        enterLoading('image_exhibit');
+        if (socket && connected) {
+          socket.emit('load-image', pathsForChoice(2));
         }
       }
     });
-  } else if (currentState === STATES.IMAGE_EXHIBIT) {
+    return;
+  }
+
+  if (currentState === STATES.IMAGE_EXHIBIT) {
     if (millis() - imageExhibitStartMs > 7000) {
-      const bx = width - 200;
-      const by = height - 100;
-      if (mouseX > bx - 180 && mouseX < bx + 180 && mouseY > by - 40 && mouseY < by + 40) {
+      const bw = min(360, width * 0.45);
+      const bh = min(72, height * 0.08);
+      const bx = width - 24 - bw / 2;
+      const by = height - min(80, height * 0.1);
+      if (
+        mx > bx - bw / 2 &&
+        mx < bx + bw / 2 &&
+        my > by - bh / 2 &&
+        my < by + bh / 2
+      ) {
         emitIdleToDisplays();
         currentState = STATES.MAIN_MENU;
         bumpInteraction();

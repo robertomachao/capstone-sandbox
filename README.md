@@ -32,7 +32,7 @@ Full spec: [Planning.md](Planning.md).
    - **Display** (open **three** times): `http://127.0.0.1:3000/display`  
      On each tab, pick **Left**, **Middle**, or **Right** once (three different tabs).
 
-   **Using the menu:** the first screen is **Idle** (short prompt on black). **Click or tap anywhere** once to open the **Main Menu** — then you see the four **Location** buttons. The three display tabs stay **plain black** until you choose a location and images exist under `assets/images/` (that is normal).
+   **Using the menu:** **Idle** → tap once → **Main Menu** with three buttons: **Instructions**, **Choose location** (then pick Location 1–4), **Close** (goodbye message). Display tabs stay black until you load images from **Choose location** / choices (normal).
 
 5. **Smoke tests**
 
