@@ -34,6 +34,31 @@ const readyStates = {
   screen4: false
 };
 
+function rosterPayload() {
+  return {
+    menu: !!clients.menu,
+    screen2: !!clients.display.screen2,
+    screen3: !!clients.display.screen3,
+    screen4: !!clients.display.screen4
+  };
+}
+
+function emitRosterToMenu() {
+  if (clients.menu) {
+    clients.menu.emit('roster', rosterPayload());
+  }
+}
+
+// Phase 1: HTTP smoke check (curl / browser) — no WebSocket required
+app.get('/api/health', (req, res) => {
+  res.json({
+    ok: true,
+    phase: 1,
+    service: 'futurescape',
+    ...rosterPayload()
+  });
+});
+
 // Socket.io connection handling
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
@@ -43,6 +68,7 @@ io.on('connection', (socket) => {
     clients.menu = socket;
     console.log('Menu screen registered:', socket.id);
     socket.emit('registered', { type: 'menu' });
+    emitRosterToMenu();
   });
 
   // Handle display screen connection with manual identification
@@ -54,6 +80,7 @@ io.on('connection', (socket) => {
       socket.screenId = screenId;
       console.log(`Display screen ${screenId} registered:`, socket.id);
       socket.emit('registered', { type: 'display', screenId: screenId });
+      emitRosterToMenu();
     } else {
       console.error('Invalid screen ID:', screenId);
       socket.emit('error', { message: 'Invalid screen ID. Must be screen2, screen3, or screen4' });
@@ -96,6 +123,7 @@ io.on('connection', (socket) => {
       clients.display[socket.screenId] = null;
       readyStates[socket.screenId] = false;
     }
+    emitRosterToMenu();
   });
 
   // Forward commands from menu to display screens

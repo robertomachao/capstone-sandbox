@@ -3,6 +3,8 @@
 
 let socket;
 let connected = false;
+/** Last roster from server (Phase 1 smoke-test HUD) */
+let roster = null;
 
 const STATES = {
   IDLE: 'idle',
@@ -30,6 +32,10 @@ function setup() {
   socket.on('registered', (data) => {
     console.log('Registered as:', data.type);
     connected = true;
+  });
+
+  socket.on('roster', (data) => {
+    roster = data;
   });
 
   socket.on('all-ready', () => {
@@ -70,6 +76,21 @@ function draw() {
       drawImageExhibit();
       break;
   }
+
+  drawPhase1RosterHud();
+}
+
+function drawPhase1RosterHud() {
+  if (!roster) return;
+  push();
+  textAlign(RIGHT, TOP);
+  textSize(28);
+  fill(connected ? color(0, 180, 80) : color(180, 60, 60));
+  const L = roster.screen2 ? 'L:OK' : 'L:--';
+  const M = roster.screen3 ? 'M:OK' : 'M:--';
+  const R = roster.screen4 ? 'R:OK' : 'R:--';
+  text(`Phase 1 | ${L} ${M} ${R}`, width - 24, 24);
+  pop();
 }
 
 function drawIdleState() {

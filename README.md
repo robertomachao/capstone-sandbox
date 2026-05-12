@@ -1,88 +1,62 @@
-# Capstone Project - Exhibition : FutureScape
+# FutureScape — Exhibition (capstone)
 
-A 4-screen interactive exhibition installation where Screen 1 serves as a touch-enabled menu/control interface, and Screens 2, 3, and 4 display synchronized pre-split content (images/videos).
+Four-screen installation: **Screen 1** is the touch menu; **Screens 2–4** are three Chrome tabs showing **pre-split image thirds** (left / middle / right), kept in sync over **Socket.io**. **Images only** (no video). **Ambisonics** is planned later.
 
-## Project Structure
+Full spec: [Planning.md](Planning.md).
 
-```
-capstone-sandbox-1/
-├── server/
-│   └── server.js              # Express + Socket.io server
-├── client/
-│   ├── menu/                  # Screen 1 (Menu/Server)
-│   │   ├── index.html
-│   │   ├── menu.js            # P5.js menu logic
-│   │   └── styles.css
-│   └── display/               # Screens 2, 3, 4 (Clients)
-│       ├── index.html
-│       ├── display.js         # P5.js display logic
-│       └── styles.css
-├── assets/
-│   ├── images/                # Location photos (pre-split into left/middle/right)
-│   └── videos/                # Video choices (pre-split into left/middle/right)
-├── package.json
-├── README.md
-└── Planning.md
-```
+## Phase 1 — deploy locally
 
-## Setup Instructions
+**Prerequisites:** Node.js 18+ (or 14+ with working npm).
 
-### Prerequisites
-- Node.js (v14 or higher)
-- npm (comes with Node.js)
+1. **Install**
 
-### Installation
-
-1. **Install dependencies:**
    ```bash
    npm install
    ```
 
-2. **Start the server:**
+2. **Sanity-check files** (no server required)
+
+   ```bash
+   npm run phase1:check
+   ```
+
+3. **Start the server** (listens on **127.0.0.1** only — one machine, no LAN bind)
+
    ```bash
    npm start
    ```
-   
-   Or for development with auto-reload:
-   ```bash
-   npm run dev
-   ```
 
-3. **Open the screens in Chrome:**
-   - **Screen 1 (Menu)**: Open `http://localhost:3000/menu` in Chrome
-   - **Screen 2 (Display)**: Open `http://localhost:3000/display` in Chrome
-   - **Screen 3 (Display)**: Open `http://localhost:3000/display` in Chrome
-   - **Screen 4 (Display)**: Open `http://localhost:3000/display` in Chrome
+4. **Open Chrome** (four tabs on the same machine)
 
-4. **Configure Display Screens:**
-   - On each display screen, click the button corresponding to its position:
-     - Screen 2: Click "Screen 2 (Left)"
-     - Screen 3: Click "Screen 3 (Middle)"
-     - Screen 4: Click "Screen 4 (Right)"
+   - Menu: `http://127.0.0.1:3000/menu`  
+   - Display (open **three** times): `http://127.0.0.1:3000/display`  
+     On each display tab, choose **Screen 2 (Left)**, **Screen 3 (Middle)**, or **Screen 4 (Right)** exactly once.
 
-## Current Status: Phase 1 Complete ✅
+5. **Smoke tests**
 
-Phase 1 includes:
-- ✅ Node.js server with Socket.io (WebSocket)
-- ✅ Basic HTML structure for menu and display screens
-- ✅ Basic P5.js sketches for both menu and display
-- ✅ Manual screen identification system
-- ✅ Basic communication protocol between server and clients
+   - **HTTP:** `http://127.0.0.1:3000/api/health` — JSON shows which sockets are connected (`menu`, `screen2`, `screen3`, `screen4`).  
+   - **With server running:** `PHASE1_PROBE=1 npm run phase1:check`  
+   - **Menu HUD:** After the menu connects, the top-right shows `Phase 1 | L:OK M:OK R:OK` as each display registers.
 
-## Next Steps (Phase 2+)
+**Offline show:** P5 is served from `client/vendor/p5.min.js` (no CDN). After `npm install`, the runtime does not need internet.
 
-- Implement full menu system with state machine
-- Add asset pre-loading and synchronization
-- Implement image/video display functionality
-- Add timeout management
-- Polish UI and animations
+## Project layout
 
-## Technical Details
+```
+server/server.js       # Express + Socket.io + /api/health
+client/menu/           # Screen 1
+client/display/        # Screens 2–4 (manual ID)
+client/vendor/p5.min.js
+assets/images/         # Your pre-split files (see menu.js path helpers)
+scripts/check-phase1.js
+```
 
-- **Resolution**: 3840 x 2160 (4K UHD)
-- **Video Format**: MP4 H.264
-- **Communication**: WebSocket (Socket.io)
-- **Screen Identification**: Manual configuration
-- **Asset Storage**: Local files
+## Development
 
-For detailed planning and requirements, see [Planning.md](Planning.md).
+```bash
+npm run dev
+```
+
+## Next phases
+
+See **Development phases** in [Planning.md](Planning.md): Phase 2 (menu timeouts / polish), Phase 3 (image pipeline hardening), Phase 4 (fades & errors), Phase 5 (ambisonics).

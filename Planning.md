@@ -189,8 +189,11 @@ capstone-sandbox-1/
 
 ## Development phases (revised)
 
-### Phase 1: Basic setup
-- Local server + Socket.io; HTML for menu + display; P5 from **local** bundle; manual screen IDs; smoke-test messaging
+### Phase 1: Basic setup — **deployed**
+- Local server + Socket.io; HTML for menu + display; P5 from **`client/vendor`**; manual screen IDs; smoke-test messaging
+- **Run:** `npm install` then `npm start` — open **Menu** and **three Display** tabs at `http://127.0.0.1:3000/menu` and `http://127.0.0.1:3000/display` (pick Left / Middle / Right on each tab).
+- **Verify layout:** `npm run phase1:check` (with server up: `PHASE1_PROBE=1 npm run phase1:check` to hit **`GET /api/health`**).
+- **Live roster:** Menu shows **Phase 1 | L:OK M:OK R:OK** (top right) when each display socket is registered.
 
 ### Phase 2: Menu system
 - Screen 1 state machine, timeouts, navigation

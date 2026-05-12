@@ -5,7 +5,8 @@
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js",
-    "dev": "nodemon server/server.js"
+    "dev": "nodemon server/server.js",
+    "phase1:check": "node scripts/check-phase1.js"
   },
   "keywords": [
     "p5js",
