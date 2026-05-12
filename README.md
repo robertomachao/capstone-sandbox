@@ -36,19 +36,27 @@ Full spec: [Planning.md](Planning.md).
 
    - **HTTP:** `http://127.0.0.1:3000/api/health` — JSON includes `phase` (milestone), `menu`, `screen2`, `screen3`, `screen4`.  
    - **With server running:** `PHASE1_PROBE=1 npm run phase1:check`  
-   - **Menu HUD:** Top-right shows **`Phase 2 | L:OK M:OK R:OK`** when displays register (connection roster).
+   - **Menu HUD:** Top-right shows **`Phase 3 | L:OK M:OK R:OK`** when displays register (connection roster).
 
 **Offline show:** P5 is served from `client/vendor/p5.min.js` (no CDN). After `npm install`, the runtime does not need internet.
 
-## Phase 2 — menu behavior (no extra install)
+**Start the server before opening the menu tab** so `preload()` can load `/api/asset-manifest`.
 
-Already included when you run Phase 1 steps above.
+## Menu behavior (Phases 2–3)
 
-- **20 second timeout:** On **Main Menu** or **Photo Selection**, if nobody touches the menu for 20 seconds, the app returns to the **Idle** screen and sends **`idle`** to the three display tabs (same as Phase 1 wiring).
-- **Touch:** The menu responds to **`touchStarted`** as well as mouse clicks (with a short debounce so one tap does not double-trigger).
-- **Loading safety:** If a load never finishes (missing assets or disconnected clients), after **120 seconds** the menu returns to **Idle**.
+- **20s inactivity** on Main Menu or Photo Selection → **Idle** (and **`idle`** to displays).
+- **Touch:** `touchStarted` shares the same handler as the mouse (debounced).
+- **Loading stall:** **120s** without all **ready** → **Idle**.
 
-Nothing else is required to “turn on” Phase 2 beyond `npm start` and refreshing the menu tab after you pull the latest code.
+## When to add your image files
+
+You **do not** need to upload images to the AI for the pipeline to work. Add files under **`assets/images/`** when you want real pictures on the wall; names must match **`assets/asset-manifest.json`** (or edit that JSON). Details: **`assets/images/ASSETS.md`**.
+
+## Phase 3 — image pipeline (same `npm start`)
+
+- **Manifest:** `http://127.0.0.1:3000/api/asset-manifest` — JSON path map for all triptychs.
+- **Health:** `/api/health` includes `"phase": 3`.
+- **Errors:** Missing or bad images → displays report **`load-error`** → menu recovers (no infinite loading); optional red error flash on the affected display tab.
 
 ## Project layout
 
@@ -57,7 +65,8 @@ server/server.js       # Express + Socket.io + /api/health
 client/menu/           # Screen 1
 client/display/        # Screens 2–4 (manual ID)
 client/vendor/p5.min.js
-assets/images/         # Your pre-split files (see menu.js path helpers)
+assets/images/         # Bitmap files (see ASSETS.md + asset-manifest.json)
+assets/asset-manifest.json
 scripts/check-phase1.js
 ```
 
@@ -69,4 +78,4 @@ npm run dev
 
 ## Next phases
 
-See [Planning.md](Planning.md): **Phase 3** (image pipeline hardening), **Phase 4** (fades & errors), **Phase 5** (ambisonics).
+See [Planning.md](Planning.md): **Phase 4** (fades & broader error handling), **Phase 5** (ambisonics).

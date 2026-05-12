@@ -5,6 +5,12 @@ let socket;
 let connected = false;
 /** Last roster from server (Phase 1 smoke-test HUD) */
 let roster = null;
+/** Triptych paths from server (Phase 3); fallback if request fails */
+let assetManifest = null;
+
+function preload() {
+  assetManifest = loadJSON('/api/asset-manifest');
+}
 
 /** Phase 2: inactivity → Idle (Planning: 20s, cancellable on transition) */
 const MENU_INACTIVITY_MS = 20000;
@@ -46,6 +52,20 @@ function setup() {
 
   socket.on('roster', (data) => {
     roster = data;
+  });
+
+  socket.on('display-load-error', (payload) => {
+    console.warn('display-load-error', payload);
+    if (currentState !== STATES.LOADING) return;
+    const dest = loadingDestination;
+    loadingDestination = null;
+    emitIdleToDisplays();
+    if (dest === 'image_exhibit') {
+      currentState = STATES.PHOTO_SELECTION;
+    } else {
+      currentState = STATES.MAIN_MENU;
+    }
+    bumpInteraction();
   });
 
   socket.on('all-ready', () => {
@@ -101,7 +121,7 @@ function drawRosterHud() {
   const L = roster.screen2 ? 'L:OK' : 'L:--';
   const M = roster.screen3 ? 'M:OK' : 'M:--';
   const R = roster.screen4 ? 'R:OK' : 'R:--';
-  text(`Phase 2 | ${L} ${M} ${R}`, width - 24, 24);
+  text(`Phase 3 | ${L} ${M} ${R}`, width - 24, 24);
   pop();
 }
 
@@ -231,8 +251,18 @@ function drawButtons(buttons) {
   });
 }
 
-/** Pre-split image paths for main-menu location (1-based index). */
+/** Pre-split image paths for main-menu location (0-based index → locations "1"…"4"). */
 function pathsForLocation(locationIndex) {
+  const k = String(locationIndex + 1);
+  const loc =
+    assetManifest && assetManifest.locations && assetManifest.locations[k];
+  if (loc && loc.screen2 && loc.screen3 && loc.screen4) {
+    return {
+      screen2: loc.screen2,
+      screen3: loc.screen3,
+      screen4: loc.screen4
+    };
+  }
   const n = locationIndex + 1;
   return {
     screen2: `/assets/images/location${n}_left.jpg`,
@@ -241,8 +271,18 @@ function pathsForLocation(locationIndex) {
   };
 }
 
-/** Pre-split image paths for secondary choice (1 or 2). */
+/** Pre-split paths for secondary choice (1 or 2). */
 function pathsForChoice(choiceNum) {
+  const k = String(choiceNum);
+  const ch =
+    assetManifest && assetManifest.choices && assetManifest.choices[k];
+  if (ch && ch.screen2 && ch.screen3 && ch.screen4) {
+    return {
+      screen2: ch.screen2,
+      screen3: ch.screen3,
+      screen4: ch.screen4
+    };
+  }
   return {
     screen2: `/assets/images/choice${choiceNum}_left.jpg`,
     screen3: `/assets/images/choice${choiceNum}_middle.jpg`,

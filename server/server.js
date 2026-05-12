@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('fs');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
@@ -16,6 +17,16 @@ app.use('/assets', express.static(path.join(__dirname, '../assets')));
 
 // P5.js bundled in repo — no CDN or extra npm package needed at runtime
 app.use('/vendor', express.static(path.join(__dirname, '../client/vendor')));
+
+const assetManifestPath = path.join(__dirname, '../assets/asset-manifest.json');
+
+/** Single source of truth for triptych paths (menu reads via GET) */
+app.get('/api/asset-manifest', (req, res) => {
+  if (!fs.existsSync(assetManifestPath)) {
+    return res.status(200).json({ locations: {}, choices: {} });
+  }
+  res.sendFile(assetManifestPath);
+});
 
 // Store connected clients
 const clients = {
@@ -53,7 +64,7 @@ function emitRosterToMenu() {
 app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
-    phase: 2,
+    phase: 3,
     service: 'futurescape',
     ...rosterPayload()
   });
@@ -128,13 +139,41 @@ io.on('connection', (socket) => {
 
   // Forward commands from menu to display screens
   socket.on('load-image', (data) => {
+    if (!data || !data.screen2 || !data.screen3 || !data.screen4) {
+      console.error('load-image rejected: need screen2, screen3, screen4 paths', data);
+      if (clients.menu) {
+        clients.menu.emit('display-load-error', { reason: 'invalid-payload' });
+      } else {
+        socket.emit('display-load-error', { reason: 'invalid-payload' });
+      }
+      return;
+    }
+
+    readyStates.screen2 = false;
+    readyStates.screen3 = false;
+    readyStates.screen4 = false;
+
     console.log('Load image command received:', data);
-    // Forward to all display screens
-    Object.values(clients.display).forEach(client => {
+    Object.values(clients.display).forEach((client) => {
       if (client) {
         client.emit('load-image', data);
       }
     });
+  });
+
+  socket.on('load-error', (payload) => {
+    console.warn('Display load error:', payload);
+    readyStates.screen2 = false;
+    readyStates.screen3 = false;
+    readyStates.screen4 = false;
+    Object.values(clients.display).forEach((client) => {
+      if (client) {
+        client.emit('cancel-load');
+      }
+    });
+    if (clients.menu) {
+      clients.menu.emit('display-load-error', payload || {});
+    }
   });
 
   socket.on('idle', () => {

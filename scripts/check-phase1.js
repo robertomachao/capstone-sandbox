@@ -18,7 +18,8 @@ const required = [
   'client/display/display.js',
   'client/vendor/p5.min.js',
   'package.json',
-  'Planning.md'
+  'Planning.md',
+  'assets/asset-manifest.json'
 ];
 
 let failed = false;

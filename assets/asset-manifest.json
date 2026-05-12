@@ -1,0 +1,36 @@
+{
+  "locations": {
+    "1": {
+      "screen2": "/assets/images/location1_left.jpg",
+      "screen3": "/assets/images/location1_middle.jpg",
+      "screen4": "/assets/images/location1_right.jpg"
+    },
+    "2": {
+      "screen2": "/assets/images/location2_left.jpg",
+      "screen3": "/assets/images/location2_middle.jpg",
+      "screen4": "/assets/images/location2_right.jpg"
+    },
+    "3": {
+      "screen2": "/assets/images/location3_left.jpg",
+      "screen3": "/assets/images/location3_middle.jpg",
+      "screen4": "/assets/images/location3_right.jpg"
+    },
+    "4": {
+      "screen2": "/assets/images/location4_left.jpg",
+      "screen3": "/assets/images/location4_middle.jpg",
+      "screen4": "/assets/images/location4_right.jpg"
+    }
+  },
+  "choices": {
+    "1": {
+      "screen2": "/assets/images/choice1_left.jpg",
+      "screen3": "/assets/images/choice1_middle.jpg",
+      "screen4": "/assets/images/choice1_right.jpg"
+    },
+    "2": {
+      "screen2": "/assets/images/choice2_left.jpg",
+      "screen3": "/assets/images/choice2_middle.jpg",
+      "screen4": "/assets/images/choice2_right.jpg"
+    }
+  }
+}

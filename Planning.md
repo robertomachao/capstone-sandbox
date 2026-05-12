@@ -193,17 +193,21 @@ capstone-sandbox-1/
 - Local server + Socket.io; HTML for menu + display; P5 from **`client/vendor`**; manual screen IDs; smoke-test messaging
 - **Run:** `npm install` then `npm start` — open **Menu** and **three Display** tabs at `http://127.0.0.1:3000/menu` and `http://127.0.0.1:3000/display` (pick Left / Middle / Right on each tab).
 - **Verify layout:** `npm run phase1:check` (with server up: `PHASE1_PROBE=1 npm run phase1:check` to hit **`GET /api/health`**).
-- **Live roster:** Menu shows **Phase 1 | L:OK M:OK R:OK** (top right) when each display socket is registered.
+- **Live roster:** Menu shows **Phase 3 | L:OK M:OK R:OK** (top right) when each display socket is registered.
 
 ### Phase 2: Menu system — **deployed**
 - Screen 1 **state machine** (idle → main menu → loading → photo selection → image exhibit) with **navigation** as before
 - **20s inactivity** on Main Menu and Photo Selection returns to **Idle** (clears displays via `idle`); timer **resets** on any tap in those states (including non-button areas)
 - **Touch:** `touchStarted()` forwards to the same handler as mouse (debounced to avoid double fire with mouse events)
 - **Loading stall:** if clients never report ready within **120s**, menu returns to **Idle** so the UI cannot hang indefinitely
-- **HUD:** menu shows **Phase 2 | L/M/R** connection line (same as Phase 1 roster)
+- **HUD:** menu shows **Phase 3 | L/M/R** connection line (same roster as Phase 1–2).
 
-### Phase 3: Image pipeline
-- **LOAD_IMAGE** path map, **READY** / **display**, triptych on three tabs at once, loading UI
+### Phase 3: Image pipeline — **deployed**
+- **`assets/asset-manifest.json`** — single map of **locations 1–4** and **choices 1–2** to `{ screen2, screen3, screen4 }` URLs; menu loads it in **`preload()`** via **`GET /api/asset-manifest`** (fallback hard-coded paths if empty).
+- **`load-image`** validated on server (all three paths required); **ready states reset** on each new load wave.
+- **`load-error`** from any display: server resets sync flags, broadcasts **`cancel-load`** to all displays, notifies menu with **`display-load-error`** (menu returns to **Main Menu** or **Photo Selection** and emits **`idle`**).
+- Displays: **load generation token** so stale `loadImage` callbacks never emit **`ready`** after cancel; **path shown** while preloading; brief **error** screen on failed file (then **`idle`** / **`cancel-load`** clears it).
+- **When to add bitmap files:** see **`assets/images/ASSETS.md`** (no image bytes required in repo for Phase 3 to ship).
 
 ### Phase 4: Polish
 - Fades, error handling, idle / stop behavior, on-site testing with 4K assets
