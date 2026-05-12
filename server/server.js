@@ -14,6 +14,9 @@ app.use('/menu', express.static(path.join(__dirname, '../client/menu')));
 app.use('/display', express.static(path.join(__dirname, '../client/display')));
 app.use('/assets', express.static(path.join(__dirname, '../assets')));
 
+// P5.js bundled in repo — no CDN or extra npm package needed at runtime
+app.use('/vendor', express.static(path.join(__dirname, '../client/vendor')));
+
 // Store connected clients
 const clients = {
   menu: null,
@@ -106,16 +109,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('load-video', (data) => {
-    console.log('Load video command received:', data);
-    // Forward to all display screens
-    Object.values(clients.display).forEach(client => {
-      if (client) {
-        client.emit('load-video', data);
-      }
-    });
-  });
-
   socket.on('idle', () => {
     console.log('Idle command received');
     // Forward to all display screens
@@ -142,8 +135,9 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/menu/index.html'));
 });
 
-server.listen(PORT, () => {
-  console.log(`FutureScape Exhibition Server running on http://localhost:${PORT}`);
-  console.log(`Menu screen: http://localhost:${PORT}/menu`);
-  console.log(`Display screens: http://localhost:${PORT}/display`);
+// Bind to loopback only: one machine, four local Chrome tabs — no LAN exposure, no internet required at runtime
+server.listen(PORT, '127.0.0.1', () => {
+  console.log(`FutureScape Exhibition Server running on http://127.0.0.1:${PORT}`);
+  console.log(`Menu screen: http://127.0.0.1:${PORT}/menu`);
+  console.log(`Display screens: http://127.0.0.1:${PORT}/display`);
 });

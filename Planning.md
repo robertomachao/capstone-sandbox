@@ -1,193 +1,146 @@
 # Capstone Project - Exhibition : FutureScape
 
 ## Project Overview
-A 4-screen interactive exhibition installation where Screen 1 serves as a touch-enabled menu/control interface, and Screens 2, 3, and 4 display synchronized pre-split content (images/videos). Each display screen shows its assigned portion (left, middle, or right) at full size - no cropping or splitting is performed in code as assets are already prepared.
+A 4-screen interactive exhibition installation where Screen 1 serves as a touch-enabled menu/control interface, and Screens 2, 3, and 4 display **synchronized pre-split images only**. Each display runs in **its own Chrome tab** (one tab per physical screen), showing the **left**, **middle**, or **right** portion of the artwork in order (Screen 2 → left, Screen 3 → middle, Screen 4 → right). Portions are shown at full size; **no cropping or splitting is done in code**—assets are prepared in advance.
+
+**Sound (future):** An **ambisonics** playback system will be added later so that spatial audio can run when a choice is made. It is **not** part of the current image-only milestone.
 
 ## Hardware Setup
 - **1 Machine** connected to 4 screens
-- **Screen 1**: Native touch screen (Menu/Server)
-- **Screen 2**: Display screen (Client - Left portion)
-- **Screen 3**: Display screen (Client - Middle portion)
-- **Screen 4**: Display screen (Client - Right portion)
-- Each screen runs in a separate Chrome tab
+- **Screen 1**: Native touch screen (Menu / coordination server UI)
+- **Screen 2**: Display (Client — **left** portion) — **dedicated Chrome tab**
+- **Screen 3**: Display (Client — **middle** portion) — **dedicated Chrome tab**
+- **Screen 4**: Display (Client — **right** portion) — **dedicated Chrome tab**
+- The menu may run in a fifth tab or on the same machine as configured; all clients connect to the **local** Node server (see **Local / offline operation** below).
+
+## Local / offline operation
+- The exhibition runs from **localhost** (Node.js + Express + Socket.io). **Browsers do not need internet** once dependencies are installed.
+- **P5.js** is bundled in **`client/vendor/p5.min.js`** and served by the local app. Browsers never need a public CDN during the show.
+- **Images** are **local files** under `assets/` and referenced by path; no remote asset URLs are required for normal operation.
+- **One-time setup** (can be done while online): run `npm install` in the project folder. After that, `npm start` and opening the local URLs works **without outbound network access** for the installation runtime.
 
 ## Application Architecture
 
 ### Communication Model
-- **Server/Client Architecture**
-  - Screen 1: Server (Menu/Controller)
-  - Screens 2, 3, 4: Clients (Receivers/Display)
-  - **Communication method: WebSocket (Socket.io)** ✓
+- **Server / client**
+  - Screen 1: Menu UI + control logic (registers as **menu** client over WebSocket)
+  - Screens 2–4: Display clients (each tab registers as **screen2**, **screen3**, or **screen4**)
+- **Communication:** WebSocket (**Socket.io**) on the local server
 
 ### Technology Stack
-- **Frontend**: P5.js for rendering
-- **Backend**: Node.js/Express server for coordination
-- **Communication**: WebSocket (Socket.io) for real-time sync
-- **Asset Management**: Pre-loading system for synchronized deployment
+- **Frontend:** P5.js for rendering (served locally)
+- **Backend:** Node.js / Express for static files and coordination
+- **Realtime:** Socket.io
+- **Assets:** Pre-load images, then **display on all three tabs at the same time** after every client reports ready
 
 ---
 
-## Screen 1 (Menu/Server) - State Machine
+## Screen 1 (Menu) — State Machine
 
 ### State 1: Idle State
-- **Display**: 
-  - Message: "Please press anywhere in the screen to open Menu"
-  - Black background
-- **Interaction**: Click anywhere → Transition to Main Menu
-- **Timeout**: 20 seconds → Return to Idle (if in Main Menu or after photo selection)
+- **Display:** Black background; message: “Please press anywhere in the screen to open Menu”
+- **Interaction:** Tap / click anywhere → Main Menu
+- **Timeout:** 20 seconds → return to Idle when applicable (see timeout section)
 
 ### State 2: Main Menu
-- **Layout**:
-  - **Top Left**: "Welcome to FutureScape, where the future is a choice away"
-  - **Bottom Right**: "by Roberto Cunha" + Logo (to be provided)
-  - **Center**: At least 4 buttons (temporary text for now)
-    - Each button represents a location/photo option
-- **Interaction**: 
-  - Click button → Select location/photo
-  - Transition to Photo Selection State
-- **Timeout**: 20 seconds of inactivity → Return to Idle State
+- **Layout:**
+  - **Top left:** “Welcome to FutureScape, where the future is a choice away”
+  - **Bottom right:** “by Roberto Cunha” + logo (to be provided)
+  - **Center:** At least **4** buttons (placeholder labels) — each selects a **location / image set**
+- **Interaction:** Button → start pre-load on display tabs → **Loading** → when all ready → **Photo Selection**
+- **Timeout:** 20 seconds inactivity → Idle
 
 ### State 3: Loading State
-- **Display**: 
-  - Rotating gauge/progress indicator
-  - Shown while assets are pre-loading on Screens 2, 3, 4
-- **Trigger**: After photo selection, while assets load
-- **Transition**: When all assets loaded → Photo Selection State
+- **Display:** Rotating gauge / progress-style indicator while Screens 2–4 **pre-load** their image portions
+- **Transition:** When all three clients confirm **READY** → next state depends on flow (**Photo Selection** after main menu choice, or **Image exhibit** after a secondary choice)
 
 ### State 4: Photo Selection State
-- **Display**: 
-  - Same layout as Main Menu but with different buttons
-  - 3 buttons:
-    1. "Back to Main Menu" (returns to Main Menu)
-    2. "Choice 1" (pre-loads and plays video1)
-    3. "Choice 2" (pre-loads and plays video2)
-- **Interaction**:
-  - Button 1 → Return to Main Menu
-  - Button 2 → Pre-load video1 → Transition to Video Playback State
-  - Button 3 → Pre-load video2 → Transition to Video Playback State
-- **Timeout**: 20 seconds of inactivity → Return to Idle State
+- **Display:** Same layout idea as Main Menu; **3** buttons:
+  1. “Back to Main Menu”
+  2. “Choice 1” — pre-loads **image set A** (three files) on clients
+  3. “Choice 2” — pre-loads **image set B** (three files) on clients
+- **Interaction:**
+  - Button 1 → Main Menu (and **IDLE** / clear signal to clients as implemented)
+  - Buttons 2–3 → **Loading** → when all ready → **Image exhibit** (full triptych on the three tabs at once)
+- **Timeout:** 20 seconds inactivity → Idle
 
-### State 5: Video Playback State
-- **Display**:
-  - Menu fades out
-  - Message fades in (temporary text for now)
-  - After 7 seconds: "Back to Main Menu" button appears (bottom right corner)
-- **Interaction**:
-  - Click "Back to Main Menu" → Stop video → Return to Main Menu
-- **Video**: Playing in loop on Screens 2, 3, 4
+### State 5: Image Exhibit State (menu overlay)
+- **Display (Screen 1):** Menu fades out; short message fades in (placeholder copy). After **7 seconds**, “Back to Main Menu” appears (e.g. bottom right).
+- **Display (Screens 2–4):** Each tab shows its **pre-split** image portion, **in sync** (same moment for left / middle / right).
+- **Interaction:** “Back to Main Menu” → clear / idle clients → Main Menu on Screen 1
 
 ---
 
-## Screens 2, 3, 4 (Clients/Display) - State Machine
+## Screens 2, 3, 4 (Clients) — State Machine
 
-### State 1: Idle/Placeholder State
-- **Display**: Placeholder background
-- **Trigger**: 
-  - Initial state
-  - When Screen 1 is in Idle or Main Menu
-  - After returning to Main Menu
+Each client is a **separate Chrome tab**, manually configured as **Screen 2**, **3**, or **4** so the server sends the correct **left / middle / right** file path.
 
-### State 2: Pre-loading State
-- **Display**: 
-  - Placeholder background (or loading indicator)
-  - Assets loading in background
-- **Trigger**: After photo/video selection on Screen 1
-- **Transition**: When asset loaded → Display State
+### State 1: Idle / Placeholder
+- Placeholder background when the menu is idle / main menu, or after return
 
-### State 3: Image Display State
-- **Display**: 
-  - Screen 2: Pre-split left portion of image (full size)
-  - Screen 3: Pre-split middle portion of image (full size)
-  - Screen 4: Pre-split right portion of image (full size)
-- **Synchronization**: All screens display simultaneously after pre-loading
-- **Trigger**: After photo selection and pre-loading complete
-- **Note**: Images are already split into 3 parts, no cropping needed
+### State 2: Pre-loading
+- Triggered when Screen 1 requests a **LOAD_IMAGE** with paths for each screen
+- Clients load **only their** file; when done, emit **READY**
 
-### State 4: Video Display State
-- **Display**: 
-  - Screen 2: Pre-split left portion of video (full size, looping)
-  - Screen 3: Pre-split middle portion of video (full size, looping)
-  - Screen 4: Pre-split right portion of video (full size, looping)
-- **Synchronization**: 
-  - All screens start playback simultaneously
-  - Videos loop continuously
-- **Trigger**: After video selection and pre-loading complete
-- **Note**: Videos are already split into 3 parts, no cropping needed
+### State 3: Image Display
+- **Screen 2:** left file at full size  
+- **Screen 3:** middle file at full size  
+- **Screen 4:** right file at full size  
+- **Synchronization:** Server issues **DISPLAY_IMAGE** (or equivalent “show” command) **only after** all three **READY** acknowledgments, so all three tabs **reveal the image at the same time**
 
 ---
 
 ## Technical Requirements
 
-### Asset Management
-- **Pre-loading System**:
-  - Assets must be fully loaded before deployment
-  - Synchronized deployment across all 3 display screens
-  - Handle loading progress and errors
-  - Support for images and videos
-- **Asset Storage**: **Local files** ✓
-- **Asset Structure**:
-  - Images and videos are **pre-split** into 3 parts (left, middle, right)
-  - Each screen receives its specific portion file path
-  - No cropping or splitting needed in code - assets are already prepared
-  - Screen 2 receives left portion, Screen 3 receives middle portion, Screen 4 receives right portion
-- **Video Format**: **MP4 H.264** ✓
-- **Resolution**: **3840 x 2160 (4K UHD)** ✓
+### Asset management
+- **Pre-load** each portion before show; handle progress and errors
+- **Storage:** local files only
+- **Structure:** each “scene” or choice has **three** image files (left, middle, right). Paths are mapped per `screen2` / `screen3` / `screen4`
+- **Resolution target:** **3840 × 2160 (4K UHD)** per portion (design intent)
 
 ### Synchronization
-- **Challenge**: Network delay between screens receiving commands
-- **Solution**: 
-  - Pre-load assets on all clients
-  - Use timestamp-based sync or ready-state confirmation
-  - Server waits for all clients to confirm "ready" before sending "play" command
-  - Consider using WebSocket with acknowledgment system
+- **Problem:** variable timing between tabs  
+- **Solution (selected):** **Ready-state confirmation**
+  - Server sends **LOAD_IMAGE** with `{ screen2: path, screen3: path, screen4: path }` (or equivalent)
+  - Each client loads its path, then sends **READY**
+  - Server waits for **all three READY**, then broadcasts **display** so all tabs switch together
 
-### Communication Protocol
-- **Message Types**:
-  - `IDLE`: Return to idle/placeholder state
-  - `LOAD_IMAGE`: Pre-load image asset (with specific portion **local file path** for this screen)
-  - `LOAD_VIDEO`: Pre-load video asset (with specific portion **local file path** for this screen)
-  - `DISPLAY_IMAGE`: Show pre-loaded image
-  - `DISPLAY_VIDEO`: Play pre-loaded video
-  - `STOP`: Stop current playback
-  - `READY`: Client confirmation that asset is loaded
-- **Note**: Each screen receives its own pre-split asset **local file path** (left, middle, or right portion)
+### Communication protocol (image-only)
+- **`IDLE`:** placeholder on clients
+- **`LOAD_IMAGE`:** pre-load with **local path** for this tab’s portion
+- **`DISPLAY_IMAGE` / display:** show the already-loaded image (current implementation may use a single “display” event after ready)
+- **`STOP`:** stop / clear as needed
+- **`READY`:** client finished loading
 
-### Timeout Management
-- **20-second timeout**:
-  - Starts when entering Main Menu
-  - Resets on any interaction
-  - Starts after photo selection
-  - Returns to Idle State when triggered
-  - Must be cancellable when transitioning to other states
+### Timeout management
+- **20 seconds:** from Main Menu entry, resets on interaction; also applies where specified; return to **Idle** when fired; must be cancellable on transitions
 
-### Animation & Transitions
-- **Fade Duration**: **Customizable** ✓
-  - Fade in/out animations for menu transitions
-  - Fade in for video playback messages
-  - Configurable timing for smooth user experience
+### Animation
+- **Fade duration:** configurable for menu and overlay messages
 
 ---
 
-## File Structure (Proposed)
+## File structure (proposed)
 
 ```
 capstone-sandbox-1/
 ├── server/
-│   ├── server.js              # Express + WebSocket server
-│   └── routes.js              # API routes (if needed)
+│   ├── server.js              # Express + Socket.io + static vendor
+│   └── routes.js              # optional
 ├── client/
-│   ├── menu/                  # Screen 1 (Menu/Server)
+│   ├── vendor/
+│   │   └── p5.min.js          # vendored P5 (offline; no CDN)
+│   ├── menu/
 │   │   ├── index.html
-│   │   ├── menu.js            # P5.js menu logic
+│   │   ├── menu.js
 │   │   └── styles.css
-│   └── display/               # Screens 2, 3, 4 (Clients)
+│   └── display/
 │       ├── index.html
-│       ├── display.js         # P5.js display logic
+│       ├── display.js
 │       └── styles.css
 ├── assets/
-│   ├── images/                # Location photos (pre-split into left/middle/right)
-│   └── videos/                # Video choices (pre-split into left/middle/right)
-├── public/                    # Static assets
+│   └── images/                # pre-split left / middle / right per scene
+├── public/                    # optional static assets
 ├── package.json
 ├── README.md
 └── Planning.md
@@ -195,105 +148,65 @@ capstone-sandbox-1/
 
 ---
 
-## Implementation Considerations
+## Implementation notes
 
-### P5.js Specifics
-- Use `loadImage()` and `loadVideo()` for asset loading
-- Use `preload()` function for initial assets
-- Implement custom pre-loading system for dynamic assets
-- Use `image()` and `video()` functions for display
-- Handle video looping with `video.loop()`
+### P5.js
+- Use **`loadImage()`** for dynamic assets; **`image()`** for drawing
+- Custom pre-load flow for choices driven by Socket.io (not only `preload()`)
 
-### Synchronization Strategy
-**Selected: Option A - Ready State Confirmation** ✓
-- Server sends `LOAD_IMAGE` / `LOAD_VIDEO` with the specific portion **local file path** for each screen (left/middle/right)
-- Each client loads its assigned asset and sends "READY" when complete
-- Server waits for all 3 clients to send "READY"
-- Server sends `DISPLAY_IMAGE` / `DISPLAY_VIDEO` to all clients simultaneously
+### Screen identification
+- **Manual** per display tab: each of the three Chrome tabs is configured as **Screen 2, 3, or 4** (UI or config) ✓
 
-~~Option B - Timestamp Sync~~ (Not selected)
-~~Option C - Frame Sync~~ (Not selected)
+### Future: ambisonics
+- Not implemented in the image-only phase; when added, it should tie to **choice** events without changing the **three-tab image sync** model unless explicitly redesigned.
 
-### Screen Identification
-**Selected: Method 3 - Manual configuration on each client** ✓
-- Each client screen will have manual configuration to identify itself (Screen 2, 3, or 4)
-- Implementation: Configuration file or UI setting on each display screen
-
-~~Method 1: URL parameters~~ (Not selected; we are using manual configuration)
-~~Method 2: Server assigns screen ID~~ (Not selected)
-
-### Error Handling
-- Network disconnection recovery
-- Asset loading failures
-- Screen connection issues
-- Timeout edge cases
+### Error handling
+- Disconnects, failed image loads, missing client READY, timeout edge cases
 
 ---
 
-## Decisions Made ✓
+## Decisions made ✓
 
-1. **Communication Protocol**: **WebSocket (Socket.io)** ✓
-2. **Screen Identification**: **Manual configuration on each client** ✓
-3. **Asset Storage**: **Local files** ✓
-4. **Video Format**: **MP4 H.264** ✓
-5. **Resolution**: **3840 x 2160 (4K UHD)** ✓
-6. **Synchronization Strategy**: **Option A - Ready State Confirmation** ✓
-7. **Fade Duration**: **Customizable** ✓
+1. **Communication:** Socket.io ✓  
+2. **Screen ID:** Manual per client tab ✓  
+3. **Assets:** Local image files, pre-split ✓  
+4. **Resolution:** 4K UHD target ✓  
+5. **Sync:** Ready-state confirmation ✓  
+6. **Fades:** Configurable ✓  
+7. **Media type:** **Images only** (no video in scope) ✓  
+8. **Runtime:** **Local / no browser CDN; no internet required** during show ✓  
+9. **Displays:** **Three Chrome tabs**, one per wall screen, **simultaneous** image show ✓  
 
-## Open Questions
+## Open questions
 
-1. **Logo**: When will the logo be provided? (Placeholder for now)
-2. **Button Text**: What should the 4+ menu buttons say? (Temporary text for now)
-3. **Message Text**: What should the message during video playback say? (Temporary text for now)
-4. **Loading Indicator**: Specific design for the rotating gauge? (Not sure yet)
+1. **Logo** timing / asset  
+2. **Final** menu button labels  
+3. **Image exhibit** overlay message copy  
+4. **Loading** gauge visual design  
+5. **Ambisonics** toolchain and trigger mapping (later)
 
 ---
 
-## Development Phases (Proposed)
+## Development phases (revised)
 
-### Phase 1: Basic Setup
-- Set up Node.js server with Socket.io (WebSocket)
-- Create basic HTML structure for menu and display screens
-- Implement basic P5.js sketches
-- Set up manual screen identification system
-- Test communication between server and clients
+### Phase 1: Basic setup
+- Local server + Socket.io; HTML for menu + display; P5 from **local** bundle; manual screen IDs; smoke-test messaging
 
-### Phase 2: Menu System
-- Implement Screen 1 state machine
-- Create Main Menu UI
-- Implement button interactions
-- Add timeout functionality
+### Phase 2: Menu system
+- Screen 1 state machine, timeouts, navigation
 
-### Phase 3: Asset Management
-- Implement pre-loading system
-- Set up asset **file-path mapping** (left/middle/right portions)
-- Test image display across 3 screens with pre-split assets
-- Add loading indicators
+### Phase 3: Image pipeline
+- **LOAD_IMAGE** path map, **READY** / **display**, triptych on three tabs at once, loading UI
 
-### Phase 4: Video Playback
-- Implement video pre-loading with pre-split assets
-- Add video synchronization across screens
-- Create video playback state
-- Implement message fade in/out
+### Phase 4: Polish
+- Fades, error handling, idle / stop behavior, on-site testing with 4K assets
 
-### Phase 5: Polish & Testing
-- Add animations and transitions
-- Test timeout scenarios
-- Optimize synchronization
-- Error handling and edge cases
+### Phase 5 (future): Ambisonics
+- Spatial audio triggered by choices; integration plan TBD
 
 ---
 
 ## Notes
-- All screens run in Chrome tabs
-- Screen 1 is touch-enabled
-- Screens 2, 3, 4 are arranged left to right
-- Assets must be pre-loaded to handle network delays
-- **Images and videos are pre-split into 3 parts** - no cropping needed in code
-- Each screen displays its assigned portion at full size (3840 x 2160 resolution)
-- Videos are MP4 H.264 format
-- Assets stored as local files
-- 20-second timeout returns to Idle state
-- Fade animations are customizable
-- Logo and specific button/message text to be provided later
-- Loading indicator design TBD
+- **Three display Chrome tabs** must stay open—one per physical screen—with correct **left / middle / right** assignment.  
+- Pre-split **images** only; no in-code splitting.  
+- **Ambisonics** is planned later; specification above is **image + sync** first.
