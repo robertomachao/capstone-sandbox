@@ -220,8 +220,12 @@ capstone-sandbox-1/
 - Displays: **load generation token** so stale `loadImage` callbacks never emit **`ready`** after cancel; **path shown** while preloading; brief **error** screen on failed file (then **`idle`** / **`cancel-load`** clears it).
 - **When to add bitmap files:** see **`assets/images/ASSETS.md`** (no image bytes required in repo for Phase 3 to ship).
 
-### Phase 4: Polish
-- Fades, error handling, idle / stop behavior, on-site testing with 4K assets
+### Phase 4: Polish — **deployed**
+- **Configurable fades** (`MENU_FADE_MS` in `menu.js`, `DISPLAY_FADE_MS` in `display.js`): image exhibit overlay, goodbye copy, display reveal on `display`, fade-out on **`idle`** / **`stop`**
+- **Image exhibit** copy in `IMAGE_EXHIBIT_LINES` (edit in `menu.js`); “Back to Menu” fades in after 7s
+- **Loading** UI: pulsing gauge + hint when L/M/R displays are not all connected
+- **`/api/health`** reports `"phase": 4`; menu HUD shows **Phase 4**
+- **On-site:** add 4K assets per `assets/images/ASSETS.md`; tune fade ms for venue lighting
 
 ### Phase 5 (future): Ambisonics
 - Spatial audio triggered by choices; integration plan TBD

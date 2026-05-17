@@ -64,7 +64,7 @@ function emitRosterToMenu() {
 app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
-    phase: 3,
+    phase: 4,
     service: 'futurescape',
     ...rosterPayload()
   });
@@ -106,17 +106,16 @@ io.on('connection', (socket) => {
       
       // Check if all screens are ready
       if (readyStates.screen2 && readyStates.screen3 && readyStates.screen4) {
-        console.log('All screens ready, sending display command');
-        // Notify menu that all screens are ready
+        console.log('All screens ready — display + all-ready');
+
+        // Show images on all clients (displays listen; menu ignores)
+        io.emit('display');
+
+        // Advance menu state machine (loading → photo selection / image exhibit)
         if (clients.menu) {
           clients.menu.emit('all-ready');
         }
-        // Send display command to all screens
-        io.to(clients.display.screen2.id).emit('display');
-        io.to(clients.display.screen3.id).emit('display');
-        io.to(clients.display.screen4.id).emit('display');
-        
-        // Reset ready states
+
         readyStates.screen2 = false;
         readyStates.screen3 = false;
         readyStates.screen4 = false;

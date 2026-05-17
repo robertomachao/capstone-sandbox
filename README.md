@@ -38,7 +38,7 @@ Full spec: [Planning.md](Planning.md).
 
    - **HTTP:** `http://127.0.0.1:3000/api/health` — JSON includes `phase` (milestone), `menu`, `screen2`, `screen3`, `screen4`.  
    - **With server running:** `PHASE1_PROBE=1 npm run phase1:check`  
-   - **Menu HUD:** Top-right shows **`Phase 3 | L:OK M:OK R:OK`** when displays register (connection roster).
+   - **Menu HUD:** Top-right shows **`Phase 4 | L:OK M:OK R:OK`** when displays register (connection roster).
 
 **Offline show:** P5 is served from `client/vendor/p5.min.js` (no CDN). After `npm install`, the runtime does not need internet.
 
@@ -51,11 +51,12 @@ Full spec: [Planning.md](Planning.md).
 - Open DevTools (F12) → **Console** on the menu tab: red errors often mean the server was not running when the tab loaded, or Socket.io failed to connect — refresh after `npm start`.
 - **Do not open the menu as a local file** (`file://…`); always use `http://127.0.0.1:3000/menu` so scripts and `/api/asset-manifest` load.
 
-## Menu behavior (Phases 2–3)
+## Menu behavior (Phases 2–4)
 
 - **20s inactivity** on Main Menu or Photo Selection → **Idle** (and **`idle`** to displays).
 - **Touch:** `touchStarted` shares the same handler as the mouse (debounced).
 - **Loading stall:** **120s** without all **ready** → **Idle**.
+- **Phase 4 fades:** walls fade in on synchronized **display**; fade to black on **idle**/**stop**; menu exhibit/goodbye text fade in (tune `MENU_FADE_MS` / `DISPLAY_FADE_MS` in the client JS).
 
 ## When to add your image files
 
@@ -64,8 +65,13 @@ You **do not** need to upload images to the AI for the pipeline to work. Add fil
 ## Phase 3 — image pipeline (same `npm start`)
 
 - **Manifest:** `http://127.0.0.1:3000/api/asset-manifest` — JSON path map for all triptychs.
-- **Health:** `/api/health` includes `"phase": 3`.
 - **Errors:** Missing or bad images → displays report **`load-error`** → menu recovers (no infinite loading); optional red error flash on the affected display tab.
+
+## Phase 4 — polish (same `npm start`)
+
+- **Health:** `/api/health` includes `"phase": 4`.
+- **Fades:** display reveal + idle/stop fade-out; menu image-exhibit and goodbye overlays.
+- **Exhibit copy:** edit `IMAGE_EXHIBIT_LINES` in `client/menu/menu.js`.
 
 ## Project layout
 
@@ -87,4 +93,4 @@ npm run dev
 
 ## Next phases
 
-See [Planning.md](Planning.md): **Phase 4** (fades & broader error handling), **Phase 5** (ambisonics).
+See [Planning.md](Planning.md): **Phase 5** (ambisonics).

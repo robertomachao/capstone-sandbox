@@ -1,6 +1,6 @@
 {
   "name": "futurescape-exhibition",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Capstone Project - Exhibition : FutureScape - 4-screen interactive installation",
   "main": "server/server.js",
   "scripts": {

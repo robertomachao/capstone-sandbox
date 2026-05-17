@@ -13,11 +13,16 @@ const STATES = {
   IDLE: 'idle',
   PRELOADING: 'preloading',
   IMAGE_DISPLAY: 'image_display',
+  FADING_OUT: 'fading_out',
   ERROR: 'error'
 };
 
 let currentState = STATES.IDLE;
 let lastErrorPath = '';
+/** Phase 4 — ms to fade image in/out (edit for on-site tuning) */
+const DISPLAY_FADE_MS = 900;
+let displayRevealStartMs = 0;
+let fadeOutStartMs = 0;
 
 window.setScreenId = function (id) {
   screenId = id;
@@ -49,11 +54,7 @@ function connectToServer() {
   });
 
   socket.on('cancel-load', () => {
-    loadToken++;
-    currentState = STATES.IDLE;
-    currentImage = null;
-    currentAsset = null;
-    lastErrorPath = '';
+    resetToIdleImmediate();
     console.log('cancel-load: returned to idle');
   });
 
@@ -61,22 +62,18 @@ function connectToServer() {
     console.log('Display command received');
     if (currentState === STATES.PRELOADING && currentImage) {
       currentState = STATES.IMAGE_DISPLAY;
+      displayRevealStartMs = millis();
     }
   });
 
   socket.on('idle', () => {
     console.log('Idle command received');
-    loadToken++;
-    currentState = STATES.IDLE;
-    currentImage = null;
-    currentAsset = null;
-    lastErrorPath = '';
+    beginFadeToIdle();
   });
 
   socket.on('stop', () => {
     console.log('Stop command received');
-    loadToken++;
-    currentState = STATES.IDLE;
+    beginFadeToIdle();
   });
 
   socket.on('disconnect', () => {
@@ -94,6 +91,35 @@ function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
 }
 
+function fadeAlphaSince(startMs, durationMs) {
+  if (durationMs <= 0) return 255;
+  return constrain((millis() - startMs) * 255 / durationMs, 0, 255);
+}
+
+function fadeOutAlphaSince(startMs, durationMs) {
+  return 255 - fadeAlphaSince(startMs, durationMs);
+}
+
+function resetToIdleImmediate() {
+  loadToken++;
+  currentState = STATES.IDLE;
+  currentImage = null;
+  currentAsset = null;
+  lastErrorPath = '';
+  displayRevealStartMs = 0;
+  fadeOutStartMs = 0;
+}
+
+function beginFadeToIdle() {
+  loadToken++;
+  if (currentState === STATES.IMAGE_DISPLAY && currentImage) {
+    currentState = STATES.FADING_OUT;
+    fadeOutStartMs = millis();
+    return;
+  }
+  resetToIdleImmediate();
+}
+
 function draw() {
   switch (currentState) {
     case STATES.IDLE:
@@ -103,7 +129,10 @@ function draw() {
       drawPreloadingState();
       break;
     case STATES.IMAGE_DISPLAY:
-      drawImageDisplay();
+      drawImageDisplay(fadeAlphaSince(displayRevealStartMs, DISPLAY_FADE_MS));
+      break;
+    case STATES.FADING_OUT:
+      drawFadeOut();
       break;
     case STATES.ERROR:
       drawErrorState();
@@ -127,12 +156,24 @@ function drawPreloadingState() {
   }
 }
 
-function drawImageDisplay() {
-  if (currentImage) {
-    background(0);
-    imageMode(CENTER);
-    image(currentImage, width / 2, height / 2, width, height);
+function drawImageDisplay(alpha) {
+  if (!currentImage) return;
+  background(0);
+  push();
+  tint(255, alpha);
+  imageMode(CENTER);
+  image(currentImage, width / 2, height / 2, width, height);
+  pop();
+}
+
+function drawFadeOut() {
+  const alpha = fadeOutAlphaSince(fadeOutStartMs, DISPLAY_FADE_MS);
+  if (alpha <= 0) {
+    resetToIdleImmediate();
+    drawIdleState();
+    return;
   }
+  drawImageDisplay(alpha);
 }
 
 function drawErrorState() {

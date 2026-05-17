@@ -12,6 +12,9 @@ function preload() {
 
 const MENU_INACTIVITY_MS = 20000;
 const LOADING_STALL_MS = 120000;
+/** Phase 4 — fade timings (ms); tune on site */
+const MENU_FADE_MS = 800;
+const IMAGE_EXHIBIT_BACK_BUTTON_MS = 7000;
 
 const STATES = {
   IDLE: 'idle',
@@ -46,6 +49,12 @@ const GOODBYE_LINES = [
   'Thank you for visiting FutureScape.',
   'We hope the future feels a little closer.',
   '— Roberto Cunha'
+];
+
+/** Shown on Screen 1 during image exhibit (walls show the triptych) */
+const IMAGE_EXHIBIT_LINES = [
+  'Your choice is on the walls.',
+  'Take a moment to look around.'
 ];
 
 function setup() {
@@ -150,8 +159,18 @@ function drawRosterHud() {
   const L = roster.screen2 ? 'L:OK' : 'L:--';
   const M = roster.screen3 ? 'M:OK' : 'M:--';
   const R = roster.screen4 ? 'R:OK' : 'R:--';
-  text(`Phase 3 | ${L} ${M} ${R}`, width - 24, 24);
+  text(`Phase 4 | ${L} ${M} ${R}`, width - 24, 24);
   pop();
+}
+
+function fadeAlpha(elapsedMs, delayMs, durationMs) {
+  const t = elapsedMs - delayMs;
+  if (t <= 0 || durationMs <= 0) return 0;
+  return constrain((t * 255) / durationMs, 0, 255);
+}
+
+function allDisplaysConnected() {
+  return roster && roster.screen2 && roster.screen3 && roster.screen4;
 }
 
 function bumpInteraction() {
@@ -296,19 +315,37 @@ function drawLocationSelect() {
 
 function drawLoadingState() {
   background(0);
+  const elapsed = millis() - loadingEnteredMs;
+  const spin = frameCount * 0.05;
+  const pulse = 0.85 + 0.15 * sin(elapsed * 0.004);
+
   push();
   translate(width / 2, height / 2);
-  rotate(frameCount * 0.05);
-  stroke(255);
+  rotate(spin);
+  stroke(255, 220);
   strokeWeight(10);
   noFill();
-  arc(0, 0, 200, 200, 0, PI * 1.5);
+  const r = 100 * pulse;
+  arc(0, 0, r * 2, r * 2, 0, PI * 1.35);
+  noStroke();
+  fill(255, 40);
+  arc(0, 0, r * 2, r * 2, 0, TWO_PI);
   pop();
 
   fill(255);
   textAlign(CENTER, CENTER);
   textSize(min(52, width / 24));
   text('Loading...', width / 2, height / 2 + 120);
+
+  if (!allDisplaysConnected()) {
+    fill(220, 160, 80);
+    textSize(min(28, width / 36));
+    text(
+      'Open three display tabs (Left, Middle, Right) and connect each to the server.',
+      width / 2,
+      height / 2 + 200
+    );
+  }
 }
 
 function drawPhotoSelection() {
@@ -341,30 +378,49 @@ function drawPhotoSelection() {
 
 function drawImageExhibit() {
   background(0);
-  fill(255);
-  textAlign(CENTER, CENTER);
-  textSize(min(56, width / 22));
-  text('Temporary message text', width / 2, height / 2);
+  const elapsed = millis() - imageExhibitStartMs;
+  const msgAlpha = fadeAlpha(elapsed, 0, MENU_FADE_MS);
 
-  if (millis() - imageExhibitStartMs > 7000) {
+  fill(255, msgAlpha);
+  textAlign(CENTER, CENTER);
+  textSize(min(48, width / 24));
+  let y = height * 0.42;
+  const lh = min(58, height / 20);
+  IMAGE_EXHIBIT_LINES.forEach((line) => {
+    text(line, width / 2, y);
+    y += lh;
+  });
+
+  if (elapsed > IMAGE_EXHIBIT_BACK_BUTTON_MS) {
+    const btnAlpha = fadeAlpha(
+      elapsed,
+      IMAGE_EXHIBIT_BACK_BUTTON_MS,
+      MENU_FADE_MS
+    );
     const bw = min(360, width * 0.45);
     const bh = min(72, height * 0.08);
-    drawButtonRow([
-      {
-        text: 'Back to Menu',
-        x: width - 24 - bw / 2,
-        y: height - min(80, height * 0.1),
-        w: bw,
-        h: bh,
-        action: 'back_menu_exhibit'
-      }
-    ]);
+    drawButtonRow(
+      [
+        {
+          text: 'Back to Menu',
+          x: width - 24 - bw / 2,
+          y: height - min(80, height * 0.1),
+          w: bw,
+          h: bh,
+          action: 'back_menu_exhibit'
+        }
+      ],
+      btnAlpha
+    );
   }
 }
 
 function drawGoodbye() {
   background(0);
-  fill(255);
+  const elapsed = millis() - goodbyeShownMs;
+  const lineAlpha = fadeAlpha(elapsed, 0, MENU_FADE_MS);
+
+  fill(255, lineAlpha);
   textAlign(CENTER, CENTER);
   textSize(min(44, width / 24));
   let y = height * 0.38;
@@ -374,19 +430,20 @@ function drawGoodbye() {
     y += lh * 1.35;
   });
 
-  if (millis() - goodbyeShownMs > 1500) {
+  if (elapsed > 1500) {
+    const hintAlpha = fadeAlpha(elapsed, 1500, MENU_FADE_MS);
     textSize(min(28, width / 32));
-    fill(180);
+    fill(180, hintAlpha);
     text('Tap anywhere to return to the welcome screen', width / 2, height * 0.72);
   }
 }
 
-function drawButtonRow(buttons) {
+function drawButtonRow(buttons, alpha = 255) {
   buttons.forEach((button) => {
-    fill(50);
+    fill(50, alpha);
     rectMode(CENTER);
     rect(button.x, button.y, button.w, button.h, 10);
-    fill(255);
+    fill(255, alpha);
     textAlign(CENTER, CENTER);
     textSize(min(44, button.h * 0.42));
     text(button.text, button.x, button.y);
@@ -572,7 +629,7 @@ function handleMenuInput() {
   }
 
   if (currentState === STATES.IMAGE_EXHIBIT) {
-    if (millis() - imageExhibitStartMs > 7000) {
+    if (millis() - imageExhibitStartMs > IMAGE_EXHIBIT_BACK_BUTTON_MS) {
       const bw = min(360, width * 0.45);
       const bh = min(72, height * 0.08);
       const bx = width - 24 - bw / 2;
