@@ -1,9 +1,9 @@
 {
   "locations": {
     "1": {
-      "screen2": "/assets/images/location1_left.jpg",
-      "screen3": "/assets/images/location1_middle.jpg",
-      "screen4": "/assets/images/location1_right.jpg"
+      "screen2": "/assets/images/SC_1_FC_L.jpg",
+      "screen3": "/assets/images/SC_1_FC_M.jpg",
+      "screen4": "/assets/images/SC_1_FC_R.jpg"
     },
     "2": {
       "screen2": "/assets/images/location2_left.jpg",
@@ -23,14 +23,14 @@
   },
   "choices": {
     "1": {
-      "screen2": "/assets/images/test001.jpg",
-      "screen3": "/assets/images/test002.jpg",
-      "screen4": "/assets/images/test003.jpg"
+      "screen2": "/assets/images/SC_1_FC-P_L.jpg",
+      "screen3": "/assets/images/SC_1_FC-P_M.jpg",
+      "screen4": "/assets/images/SC_1_FC-P_R.jpg"
     },
     "2": {
-      "screen2": "/assets/images/choice2_left.jpg",
-      "screen3": "/assets/images/choice2_middle.jpg",
-      "screen4": "/assets/images/choice2_right.jpg"
+      "screen2": "/assets/images/SC_1_FC-N_L.jpg",
+      "screen3": "/assets/images/SC_1_FC-N_M.jpg",
+      "screen4": "/assets/images/SC_1_FC-N_R.jpg"
     }
   }
 }

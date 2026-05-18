@@ -23,12 +23,21 @@ let lastErrorPath = '';
 const DISPLAY_FADE_MS = 900;
 let displayRevealStartMs = 0;
 let fadeOutStartMs = 0;
+let pendingDisplay = false;
+let loadTimeoutId = null;
+let loadRetryCount = 0;
+const IMAGE_LOAD_TIMEOUT_MS = 45000;
+const IMAGE_LOAD_MAX_RETRIES = 120;
 
 window.setScreenId = function (id) {
   screenId = id;
   document.getElementById('status').textContent = `Configured as: ${id}`;
   document.getElementById('screen-config').style.display = 'none';
   document.getElementById('p5-container').style.display = 'block';
+
+  if (typeof resizeCanvas === 'function') {
+    resizeCanvas(windowWidth, windowHeight);
+  }
 
   connectToServer();
 };
@@ -60,10 +69,7 @@ function connectToServer() {
 
   socket.on('display', () => {
     console.log('Display command received');
-    if (currentState === STATES.PRELOADING && currentImage) {
-      currentState = STATES.IMAGE_DISPLAY;
-      displayRevealStartMs = millis();
-    }
+    applyDisplayReveal();
   });
 
   socket.on('idle', () => {
@@ -100,14 +106,39 @@ function fadeOutAlphaSince(startMs, durationMs) {
   return 255 - fadeAlphaSince(startMs, durationMs);
 }
 
+function clearLoadTimeout() {
+  if (loadTimeoutId) {
+    clearTimeout(loadTimeoutId);
+    loadTimeoutId = null;
+  }
+}
+
 function resetToIdleImmediate() {
   loadToken++;
+  clearLoadTimeout();
+  pendingDisplay = false;
   currentState = STATES.IDLE;
   currentImage = null;
   currentAsset = null;
   lastErrorPath = '';
   displayRevealStartMs = 0;
   fadeOutStartMs = 0;
+}
+
+function imageIsDrawable(img) {
+  return img && typeof img.width === 'number' && img.width > 0;
+}
+
+function applyDisplayReveal() {
+  if (!imageIsDrawable(currentImage)) {
+    pendingDisplay = true;
+    console.warn('display deferred — image not drawable yet');
+    return;
+  }
+  pendingDisplay = false;
+  currentState = STATES.IMAGE_DISPLAY;
+  displayRevealStartMs = millis();
+  console.log('Showing image on', screenId);
 }
 
 function beginFadeToIdle() {
@@ -186,41 +217,67 @@ function drawErrorState() {
   text(lastErrorPath || 'unknown path', width / 2, height / 2 + 40);
 }
 
+function failLoad(filePath, reason, myToken) {
+  if (myToken !== loadToken) {
+    return;
+  }
+  clearLoadTimeout();
+  console.error('Failed to load image:', filePath, reason);
+  lastErrorPath = filePath || reason;
+  currentState = STATES.ERROR;
+  pendingDisplay = false;
+  socket.emit('load-error', { screenId, path: filePath, reason: reason });
+}
+
+function onImageLoaded(filePath, myToken) {
+  if (myToken !== loadToken) {
+    return;
+  }
+  if (!imageIsDrawable(currentImage)) {
+    loadRetryCount++;
+    if (loadRetryCount > IMAGE_LOAD_MAX_RETRIES) {
+      failLoad(filePath, 'load-incomplete', myToken);
+      return;
+    }
+    setTimeout(() => onImageLoaded(filePath, myToken), 50);
+    return;
+  }
+  loadRetryCount = 0;
+  clearLoadTimeout();
+  console.log('Image loaded:', filePath);
+  socket.emit('ready', { screenId: screenId });
+  if (pendingDisplay) {
+    applyDisplayReveal();
+  }
+}
+
 function loadImageAsset(data) {
   const myToken = ++loadToken;
+  clearLoadTimeout();
+  pendingDisplay = false;
+  loadRetryCount = 0;
   currentState = STATES.PRELOADING;
   lastErrorPath = '';
+  currentImage = null;
 
   const filePath = data[screenId];
 
   if (!filePath) {
     console.error('No file path for', screenId);
-    currentState = STATES.ERROR;
-    lastErrorPath = '(missing path for ' + screenId + ')';
-    socket.emit('load-error', { screenId, path: null, reason: 'no-path' });
+    failLoad(null, 'no-path', myToken);
     return;
   }
 
   console.log('Loading image:', filePath);
   currentAsset = filePath;
 
+  loadTimeoutId = setTimeout(() => {
+    failLoad(filePath, 'load-timeout', myToken);
+  }, IMAGE_LOAD_TIMEOUT_MS);
+
   currentImage = loadImage(
     filePath,
-    () => {
-      if (myToken !== loadToken) {
-        return;
-      }
-      console.log('Image loaded:', filePath);
-      socket.emit('ready', { screenId: screenId });
-    },
-    () => {
-      if (myToken !== loadToken) {
-        return;
-      }
-      console.error('Failed to load image:', filePath);
-      lastErrorPath = filePath;
-      currentState = STATES.ERROR;
-      socket.emit('load-error', { screenId, path: filePath, reason: 'load-failed' });
-    }
+    () => onImageLoaded(filePath, myToken),
+    () => failLoad(filePath, 'load-failed', myToken)
   );
 }

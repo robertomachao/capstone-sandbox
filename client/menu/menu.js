@@ -36,6 +36,8 @@ const INPUT_DEBOUNCE_MS = 350;
 let lastInputEventMs = 0;
 /** After goodbye, allow tap to dismiss to idle */
 let goodbyeShownMs = 0;
+let loadProgress = { screen2: false, screen3: false, screen4: false };
+let loadingErrorMessage = '';
 
 /** Copy — edit anytime */
 const INSTRUCTION_LINES = [
@@ -57,6 +59,12 @@ const IMAGE_EXHIBIT_LINES = [
   'Take a moment to look around.'
 ];
 
+/** Photo selection — edit labels anytime */
+const CHOICE_LABELS = {
+  1: 'Conserve water and protect our rivers - use only what we need;',
+  2: 'Ignore water shortages - keep consuming without limits.'
+};
+
 function setup() {
   const cnv = createCanvas(windowWidth, windowHeight);
   cnv.parent('p5-container');
@@ -77,11 +85,24 @@ function setup() {
     roster = data;
   });
 
+  socket.on('load-progress', (progress) => {
+    loadProgress = progress || loadProgress;
+  });
+
   socket.on('display-load-error', (payload) => {
     console.warn('display-load-error', payload);
-    if (currentState !== STATES.LOADING) return;
+    if (payload && payload.reason === 'displays-missing') {
+      loadingErrorMessage =
+        'Connect all three display tabs (Left, Middle, Right), then try again.';
+    } else {
+      loadingErrorMessage = 'Could not load images. Check files in assets/images/.';
+    }
+    if (currentState !== STATES.LOADING) {
+      return;
+    }
     const dest = loadingDestination;
     loadingDestination = null;
+    loadProgress = { screen2: false, screen3: false, screen4: false };
     emitIdleToDisplays();
     if (dest === 'image_exhibit') {
       currentState = STATES.PHOTO_SELECTION;
@@ -96,6 +117,8 @@ function setup() {
   socket.on('all-ready', () => {
     console.log('All display screens are ready');
     if (currentState !== STATES.LOADING || !loadingDestination) return;
+    loadingErrorMessage = '';
+    loadProgress = { screen2: false, screen3: false, screen4: false };
     if (loadingDestination === 'photo_selection') {
       currentState = STATES.PHOTO_SELECTION;
     } else if (loadingDestination === 'image_exhibit') {
@@ -188,6 +211,23 @@ function enterLoading(destination) {
   loadingDestination = destination;
   currentState = STATES.LOADING;
   loadingEnteredMs = millis();
+  loadProgress = { screen2: false, screen3: false, screen4: false };
+}
+
+function tryStartLoad(destination, paths) {
+  if (!socket || !connected) {
+    loadingErrorMessage = 'Menu is not connected to the server. Refresh after npm start.';
+    return false;
+  }
+  if (!allDisplaysConnected()) {
+    loadingErrorMessage =
+      'Connect all three display tabs (Left, Middle, Right), then try again.';
+    return false;
+  }
+  loadingErrorMessage = '';
+  enterLoading(destination);
+  socket.emit('load-image', paths);
+  return true;
 }
 
 function checkMenuTimeouts() {
@@ -310,6 +350,12 @@ function drawLocationSelect() {
   textSize(min(40, width / 26));
   text('Choose a location', width / 2, height * 0.26);
 
+  if (loadingErrorMessage) {
+    fill(220, 100, 80);
+    textSize(min(26, width / 36));
+    text(loadingErrorMessage, width / 2, height * 0.34);
+  }
+
   drawButtonRow(layoutLocationButtons());
 }
 
@@ -337,15 +383,57 @@ function drawLoadingState() {
   textSize(min(52, width / 24));
   text('Loading...', width / 2, height / 2 + 120);
 
+  const readyLine = `Ready: ${loadProgress.screen2 ? 'L✓' : 'L…'} ${loadProgress.screen3 ? 'M✓' : 'M…'} ${loadProgress.screen4 ? 'R✓' : 'R…'}`;
+  fill(200);
+  textSize(min(30, width / 34));
+  text(readyLine, width / 2, height / 2 + 200);
+
   if (!allDisplaysConnected()) {
     fill(220, 160, 80);
-    textSize(min(28, width / 36));
+    textSize(min(26, width / 38));
     text(
       'Open three display tabs (Left, Middle, Right) and connect each to the server.',
       width / 2,
-      height / 2 + 200
+      height / 2 + 260
     );
   }
+}
+
+function layoutPhotoSelectionButtons() {
+  const bw = min(1100, width * 0.9);
+  const backBh = min(88, height * 0.095);
+  const choiceBh = min(120, height * 0.13);
+  const cx = width / 2;
+  const gap = 16;
+  const top = height * 0.36;
+  return [
+    {
+      text: 'Back to Menu',
+      x: cx,
+      y: top,
+      w: bw,
+      h: backBh,
+      action: 'back_main'
+    },
+    {
+      text: CHOICE_LABELS[1],
+      x: cx,
+      y: top + backBh + gap,
+      w: bw,
+      h: choiceBh,
+      action: 'choice1',
+      wrap: true
+    },
+    {
+      text: CHOICE_LABELS[2],
+      x: cx,
+      y: top + backBh + gap + choiceBh + gap,
+      w: bw,
+      h: choiceBh,
+      action: 'choice2',
+      wrap: true
+    }
+  ];
 }
 
 function drawPhotoSelection() {
@@ -357,23 +445,13 @@ function drawPhotoSelection() {
   textSize(min(38, width / 28));
   text('Make a choice', width / 2, height * 0.26);
 
-  const bw = min(520, width * 0.82);
-  const bh = min(88, height * 0.095);
-  const cx = width / 2;
-  const gap = bh + 14;
-  const top = height * 0.38;
-  drawButtonRow([
-    {
-      text: 'Back to Menu',
-      x: cx,
-      y: top,
-      w: bw,
-      h: bh,
-      action: 'back_main'
-    },
-    { text: 'Choice 1', x: cx, y: top + gap, w: bw, h: bh, action: 'choice1' },
-    { text: 'Choice 2', x: cx, y: top + gap * 2, w: bw, h: bh, action: 'choice2' }
-  ]);
+  if (loadingErrorMessage) {
+    fill(220, 100, 80);
+    textSize(min(26, width / 36));
+    text(loadingErrorMessage, width / 2, height * 0.34);
+  }
+
+  drawButtonRow(layoutPhotoSelectionButtons());
 }
 
 function drawImageExhibit() {
@@ -438,6 +516,24 @@ function drawGoodbye() {
   }
 }
 
+function wrapButtonLines(label, maxWidth, size) {
+  textSize(size);
+  const words = label.split(/\s+/);
+  const lines = [];
+  let line = '';
+  words.forEach((word) => {
+    const trial = line ? `${line} ${word}` : word;
+    if (textWidth(trial) <= maxWidth) {
+      line = trial;
+    } else {
+      if (line) lines.push(line);
+      line = word;
+    }
+  });
+  if (line) lines.push(line);
+  return lines;
+}
+
 function drawButtonRow(buttons, alpha = 255) {
   buttons.forEach((button) => {
     fill(50, alpha);
@@ -445,8 +541,20 @@ function drawButtonRow(buttons, alpha = 255) {
     rect(button.x, button.y, button.w, button.h, 10);
     fill(255, alpha);
     textAlign(CENTER, CENTER);
-    textSize(min(44, button.h * 0.42));
-    text(button.text, button.x, button.y);
+    const size = button.wrap
+      ? min(26, button.w / 34)
+      : min(44, button.h * 0.42);
+    textSize(size);
+    if (button.wrap) {
+      const lines = wrapButtonLines(button.text, button.w - 32, size);
+      const lh = size * 1.25;
+      const startY = button.y - ((lines.length - 1) * lh) / 2;
+      lines.forEach((ln, i) => {
+        text(ln, button.x, startY + i * lh);
+      });
+    } else {
+      text(button.text, button.x, button.y);
+    }
   });
 }
 
@@ -471,6 +579,13 @@ function pathsForLocation(locationIndex) {
     };
   }
   const n = locationIndex + 1;
+  if (n === 1) {
+    return {
+      screen2: '/assets/images/SC_1_FC_L.jpg',
+      screen3: '/assets/images/SC_1_FC_M.jpg',
+      screen4: '/assets/images/SC_1_FC_R.jpg'
+    };
+  }
   return {
     screen2: `/assets/images/location${n}_left.jpg`,
     screen3: `/assets/images/location${n}_middle.jpg`,
@@ -487,6 +602,20 @@ function pathsForChoice(choiceNum) {
       screen2: ch.screen2,
       screen3: ch.screen3,
       screen4: ch.screen4
+    };
+  }
+  if (choiceNum === 1) {
+    return {
+      screen2: '/assets/images/SC_1_FC-P_L.jpg',
+      screen3: '/assets/images/SC_1_FC-P_M.jpg',
+      screen4: '/assets/images/SC_1_FC-P_R.jpg'
+    };
+  }
+  if (choiceNum === 2) {
+    return {
+      screen2: '/assets/images/SC_1_FC-N_L.jpg',
+      screen3: '/assets/images/SC_1_FC-N_M.jpg',
+      screen4: '/assets/images/SC_1_FC-N_R.jpg'
     };
   }
   return {
@@ -587,42 +716,23 @@ function handleMenuInput() {
         currentState = STATES.MAIN_MENU;
         bumpInteraction();
       } else if (typeof b.index === 'number') {
-        enterLoading('photo_selection');
-        if (socket && connected) {
-          socket.emit('load-image', pathsForLocation(b.index));
-        }
+        tryStartLoad('photo_selection', pathsForLocation(b.index));
       }
     });
     return;
   }
 
   if (currentState === STATES.PHOTO_SELECTION) {
-    const bw = min(520, width * 0.82);
-    const bh = min(88, height * 0.095);
-    const cx = width / 2;
-    const gap = bh + 14;
-    const top = height * 0.38;
-    const rows = [
-      { text: 'Back to Menu', x: cx, y: top, w: bw, h: bh, action: 'back_main' },
-      { text: 'Choice 1', x: cx, y: top + gap, w: bw, h: bh, action: 'choice1' },
-      { text: 'Choice 2', x: cx, y: top + gap * 2, w: bw, h: bh, action: 'choice2' }
-    ];
-    rows.forEach((b) => {
+    layoutPhotoSelectionButtons().forEach((b) => {
       if (!hitRect(mx, my, b)) return;
       if (b.action === 'back_main') {
         emitIdleToDisplays();
         currentState = STATES.MAIN_MENU;
         bumpInteraction();
       } else if (b.action === 'choice1') {
-        enterLoading('image_exhibit');
-        if (socket && connected) {
-          socket.emit('load-image', pathsForChoice(1));
-        }
+        tryStartLoad('image_exhibit', pathsForChoice(1));
       } else if (b.action === 'choice2') {
-        enterLoading('image_exhibit');
-        if (socket && connected) {
-          socket.emit('load-image', pathsForChoice(2));
-        }
+        tryStartLoad('image_exhibit', pathsForChoice(2));
       }
     });
     return;

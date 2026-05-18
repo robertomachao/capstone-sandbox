@@ -45,6 +45,59 @@ const readyStates = {
   screen4: false
 };
 
+const DISPLAY_IDS = ['screen2', 'screen3', 'screen4'];
+
+function connectedDisplayIds() {
+  return DISPLAY_IDS.filter((id) => clients.display[id]);
+}
+
+function allDisplaysConnected() {
+  return connectedDisplayIds().length === DISPLAY_IDS.length;
+}
+
+function emitToDisplays(event, payload) {
+  DISPLAY_IDS.forEach((id) => {
+    const client = clients.display[id];
+    if (client) {
+      if (payload !== undefined) {
+        client.emit(event, payload);
+      } else {
+        client.emit(event);
+      }
+    }
+  });
+}
+
+function emitLoadProgressToMenu() {
+  if (!clients.menu) return;
+  clients.menu.emit('load-progress', {
+    screen2: readyStates.screen2,
+    screen3: readyStates.screen3,
+    screen4: readyStates.screen4
+  });
+}
+
+function tryCompleteLoadWave() {
+  if (!allDisplaysConnected()) {
+    return;
+  }
+  const allReady = DISPLAY_IDS.every((id) => readyStates[id]);
+  if (!allReady) {
+    return;
+  }
+
+  console.log('All screens ready — display + all-ready');
+  emitToDisplays('display');
+
+  if (clients.menu) {
+    clients.menu.emit('all-ready');
+  }
+
+  DISPLAY_IDS.forEach((id) => {
+    readyStates[id] = false;
+  });
+}
+
 function rosterPayload() {
   return {
     menu: !!clients.menu,
@@ -99,28 +152,18 @@ io.on('connection', (socket) => {
   });
 
   // Handle ready state from display screens
-  socket.on('ready', (data) => {
-    if (socket.screenId) {
-      readyStates[socket.screenId] = true;
-      console.log(`${socket.screenId} is ready`);
-      
-      // Check if all screens are ready
-      if (readyStates.screen2 && readyStates.screen3 && readyStates.screen4) {
-        console.log('All screens ready — display + all-ready');
-
-        // Show images on all clients (displays listen; menu ignores)
-        io.emit('display');
-
-        // Advance menu state machine (loading → photo selection / image exhibit)
-        if (clients.menu) {
-          clients.menu.emit('all-ready');
-        }
-
-        readyStates.screen2 = false;
-        readyStates.screen3 = false;
-        readyStates.screen4 = false;
-      }
+  socket.on('ready', () => {
+    if (!socket.screenId || !DISPLAY_IDS.includes(socket.screenId)) {
+      return;
     }
+    if (!clients.display[socket.screenId]) {
+      return;
+    }
+
+    readyStates[socket.screenId] = true;
+    console.log(`${socket.screenId} is ready`);
+    emitLoadProgressToMenu();
+    tryCompleteLoadWave();
   });
 
   // Handle disconnect
@@ -138,26 +181,34 @@ io.on('connection', (socket) => {
 
   // Forward commands from menu to display screens
   socket.on('load-image', (data) => {
+    const notifyMenu = (payload) => {
+      if (clients.menu) {
+        clients.menu.emit('display-load-error', payload);
+      } else {
+        socket.emit('display-load-error', payload);
+      }
+    };
+
     if (!data || !data.screen2 || !data.screen3 || !data.screen4) {
       console.error('load-image rejected: need screen2, screen3, screen4 paths', data);
-      if (clients.menu) {
-        clients.menu.emit('display-load-error', { reason: 'invalid-payload' });
-      } else {
-        socket.emit('display-load-error', { reason: 'invalid-payload' });
-      }
+      notifyMenu({ reason: 'invalid-payload' });
       return;
     }
 
-    readyStates.screen2 = false;
-    readyStates.screen3 = false;
-    readyStates.screen4 = false;
+    if (!allDisplaysConnected()) {
+      const missing = DISPLAY_IDS.filter((id) => !clients.display[id]);
+      console.error('load-image rejected: displays not connected', missing);
+      notifyMenu({ reason: 'displays-missing', missing });
+      return;
+    }
+
+    DISPLAY_IDS.forEach((id) => {
+      readyStates[id] = false;
+    });
+    emitLoadProgressToMenu();
 
     console.log('Load image command received:', data);
-    Object.values(clients.display).forEach((client) => {
-      if (client) {
-        client.emit('load-image', data);
-      }
-    });
+    emitToDisplays('load-image', data);
   });
 
   socket.on('load-error', (payload) => {
@@ -165,11 +216,7 @@ io.on('connection', (socket) => {
     readyStates.screen2 = false;
     readyStates.screen3 = false;
     readyStates.screen4 = false;
-    Object.values(clients.display).forEach((client) => {
-      if (client) {
-        client.emit('cancel-load');
-      }
-    });
+    emitToDisplays('cancel-load');
     if (clients.menu) {
       clients.menu.emit('display-load-error', payload || {});
     }
@@ -178,21 +225,13 @@ io.on('connection', (socket) => {
   socket.on('idle', () => {
     console.log('Idle command received');
     // Forward to all display screens
-    Object.values(clients.display).forEach(client => {
-      if (client) {
-        client.emit('idle');
-      }
-    });
+    emitToDisplays('idle');
   });
 
   socket.on('stop', () => {
     console.log('Stop command received');
     // Forward to all display screens
-    Object.values(clients.display).forEach(client => {
-      if (client) {
-        client.emit('stop');
-      }
-    });
+    emitToDisplays('stop');
   });
 });
 
