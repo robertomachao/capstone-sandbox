@@ -1,21 +1,38 @@
 {
+  "fonts": {
+    "menu": "/assets/Fonts/Montserrat-Regular.ttf",
+    "montserratRegular": "/assets/Fonts/Montserrat-Regular.ttf",
+    "montserratBold": "/assets/Fonts/Montserrat-Bold.ttf",
+    "montserratMedium": "/assets/Fonts/Montserrat-Medium.ttf",
+    "montserratLight": "/assets/Fonts/Montserrat-Light.ttf",
+    "montserratBlack": "/assets/Fonts/Montserrat-Black.ttf",
+    "montserratExtraBold": "/assets/Fonts/Montserrat-ExtraBold.ttf"
+  },
   "locations": {
     "1": {
+      "menuImage": "/assets/images/0001_Menu.jpg",
+      "menuImageAspect": 5.333333333333333,
       "screen2": "/assets/images/SC_1_FC_L.jpg",
       "screen3": "/assets/images/SC_1_FC_M.jpg",
       "screen4": "/assets/images/SC_1_FC_R.jpg"
     },
     "2": {
+      "menuImage": "/assets/images/0002_Menu.jpg",
+      "menuImageAspect": 5.333333333333333,
       "screen2": "/assets/images/location2_left.jpg",
       "screen3": "/assets/images/location2_middle.jpg",
       "screen4": "/assets/images/location2_right.jpg"
     },
     "3": {
+      "menuImage": "/assets/images/0003_Menu.jpg",
+      "menuImageAspect": 5.333333333333333,
       "screen2": "/assets/images/location3_left.jpg",
       "screen3": "/assets/images/location3_middle.jpg",
       "screen4": "/assets/images/location3_right.jpg"
     },
     "4": {
+      "menuImage": "/assets/images/0004_Menu.jpg",
+      "menuImageAspect": 5.333333333333333,
       "screen2": "/assets/images/location4_left.jpg",
       "screen3": "/assets/images/location4_middle.jpg",
       "screen4": "/assets/images/location4_right.jpg"

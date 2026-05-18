@@ -5,9 +5,111 @@ let socket;
 let connected = false;
 let roster = null;
 let assetManifest = null;
+let menuFont = null;
+/** Menu picker art only (never triptych wall panels) — index 0–3 */
+let locationMenuImages = [null, null, null, null];
+/** idle | loading | loaded | unavailable */
+let locationMenuLoadState = ['idle', 'idle', 'idle', 'idle'];
+/** 000N_Menu.jpg — 5760×1080 */
+const MENU_PICKER_ASPECT = 5760 / 1080;
+
+function defaultMenuImagePath(locationNum) {
+  const n = String(locationNum).padStart(4, '0');
+  return `/assets/images/${n}_Menu.jpg`;
+}
+
+function onAssetManifestReady() {
+  const fontPath = menuFontPath();
+  if (fontPath) {
+    menuFont = loadFont(fontPath);
+  }
+  loadLocationMenuImages();
+}
 
 function preload() {
-  assetManifest = loadJSON('/api/asset-manifest');
+  assetManifest = loadJSON('/api/asset-manifest', onAssetManifestReady);
+}
+
+function loadLocationMenuImages() {
+  if (!assetManifest || !assetManifest.locations) {
+    return;
+  }
+  for (let i = 0; i < 4; i++) {
+    const imgPath = menuImagePathForLocation(i);
+    if (!imgPath) {
+      locationMenuLoadState[i] = 'idle';
+      continue;
+    }
+    if (
+      locationMenuLoadState[i] === 'loaded' &&
+      imageIsDrawable(locationMenuImages[i])
+    ) {
+      continue;
+    }
+    if (locationMenuLoadState[i] === 'loading') {
+      continue;
+    }
+
+    locationMenuLoadState[i] = 'loading';
+    const slot = i;
+    loadImage(
+      imgPath,
+      (img) => {
+        locationMenuImages[slot] = img;
+        locationMenuLoadState[slot] = imageIsDrawable(img)
+          ? 'loaded'
+          : 'unavailable';
+        if (locationMenuLoadState[slot] === 'loaded') {
+          console.log('Menu picker loaded:', imgPath);
+        }
+      },
+      () => {
+        locationMenuImages[slot] = null;
+        locationMenuLoadState[slot] = 'unavailable';
+        console.warn('Menu picker not found (add file later):', imgPath);
+      }
+    );
+  }
+}
+
+function menuFontPath() {
+  if (assetManifest && assetManifest.fonts) {
+    if (assetManifest.fonts.menu) return assetManifest.fonts.menu;
+    if (assetManifest.fonts.montserratRegular) {
+      return assetManifest.fonts.montserratRegular;
+    }
+  }
+  return '/assets/Fonts/Montserrat-Regular.ttf';
+}
+
+function applyMenuFont() {
+  if (menuFont) {
+    textFont(menuFont);
+  }
+}
+
+function menuImagePathForLocation(locationIndex) {
+  const n = locationIndex + 1;
+  const k = String(n);
+  const loc =
+    assetManifest && assetManifest.locations && assetManifest.locations[k];
+  if (loc && loc.menuImage === false) {
+    return null;
+  }
+  if (loc && loc.menuImage) {
+    return loc.menuImage;
+  }
+  return defaultMenuImagePath(n);
+}
+
+function menuPickerAspectForLocation(locationIndex) {
+  const k = String(locationIndex + 1);
+  const loc =
+    assetManifest && assetManifest.locations && assetManifest.locations[k];
+  if (loc && loc.menuImageAspect) {
+    return loc.menuImageAspect;
+  }
+  return MENU_PICKER_ASPECT;
 }
 
 const MENU_INACTIVITY_MS = 20000;
@@ -68,6 +170,10 @@ const CHOICE_LABELS = {
 function setup() {
   const cnv = createCanvas(windowWidth, windowHeight);
   cnv.parent('p5-container');
+
+  if (assetManifest && assetManifest.locations) {
+    loadLocationMenuImages();
+  }
 
   socket = io();
 
@@ -141,6 +247,7 @@ function windowResized() {
 
 function draw() {
   background(0);
+  applyMenuFont();
 
   switch (currentState) {
     case STATES.IDLE:
@@ -254,13 +361,13 @@ function checkMenuTimeouts() {
 
 function drawBrandingHeader() {
   fill(255);
-  textAlign(LEFT, TOP);
+  textAlign(CENTER, TOP);
   textSize(min(48, width / 28));
-  text('Welcome to FutureScape, where the future is a choice away', 24, 24);
+  text('Welcome to FutureScape, where the future is a choice away', width / 2, 24);
 
-  textAlign(RIGHT, BOTTOM);
+  textAlign(CENTER, BOTTOM);
   textSize(min(36, width / 36));
-  text('by Roberto Cunha', width - 24, height - 24);
+  text('by Roberto Cunha', width / 2, height - 24);
 }
 
 function drawIdleState() {
@@ -319,44 +426,172 @@ function drawInstructions() {
   ]);
 }
 
-function layoutLocationButtons() {
-  const bw = min(520, width * 0.82);
-  const bh = min(88, height * 0.095);
+function layoutLocationImageStack() {
   const cx = width / 2;
-  const gap = bh + 14;
-  const top = height * 0.38;
-  return [
-    { text: 'Location 1', x: cx, y: top, w: bw, h: bh, index: 0 },
-    { text: 'Location 2', x: cx, y: top + gap, w: bw, h: bh, index: 1 },
-    { text: 'Location 3', x: cx, y: top + gap * 2, w: bw, h: bh, index: 2 },
-    { text: 'Location 4', x: cx, y: top + gap * 3, w: bw, h: bh, index: 3 },
-    {
-      text: 'Back to Menu',
-      x: cx,
-      y: top + gap * 4 + 24,
-      w: bw,
-      h: bh,
-      action: 'back_menu'
+  const gap = 10;
+  const top = height * 0.17;
+  const backBh = min(88, height * 0.095);
+  const reservedBottom = backBh + 40;
+  const availableH = height - top - reservedBottom;
+  const placeholderH = min(72, height * 0.08);
+
+  let tileW = min(1200, width * 0.92);
+  let tileH = tileW / MENU_PICKER_ASPECT;
+  const aspects = [0, 1, 2, 3].map(menuPickerAspectForLocation);
+  const maxAspect = max(aspects);
+  tileH = tileW / maxAspect;
+
+  let totalH = 0;
+  for (let i = 0; i < 4; i++) {
+    const h = menuImagePathForLocation(i) ? tileH : placeholderH;
+    totalH += h + (i < 3 ? gap : 0);
+  }
+
+  if (totalH > availableH) {
+    const menuCount = [0, 1, 2, 3].filter((i) => menuImagePathForLocation(i)).length;
+    const placeCount = 4 - menuCount;
+    const menuH = (availableH - gap * 3 - placeCount * placeholderH) / max(menuCount, 1);
+    tileH = menuH;
+    tileW = tileH * maxAspect;
+    if (tileW > width * 0.92) {
+      tileW = width * 0.92;
+      tileH = tileW / maxAspect;
     }
-  ];
+  }
+
+  const tiles = [];
+  let y = top;
+  for (let i = 0; i < 4; i++) {
+    const hasMenu = !!menuImagePathForLocation(i);
+    const h = hasMenu ? tileH : placeholderH;
+    tiles.push({
+      index: i,
+      x: cx,
+      y: y + h / 2,
+      w: tileW,
+      h: h,
+      hasMenuImage: hasMenu
+    });
+    y += h + gap;
+  }
+  return { tiles, stackBottom: y - gap };
+}
+
+function layoutLocationBackButton(stackBottom) {
+  const bw = min(480, width * 0.75);
+  const bh = min(88, height * 0.1);
+  return {
+    text: 'Back to Menu',
+    x: width / 2,
+    y: stackBottom + 28 + bh / 2,
+    w: bw,
+    h: bh,
+    action: 'back_menu'
+  };
+}
+
+const LOCATION_TILE_RADIUS = 10;
+
+function clipRoundedRect(cx, cy, w, h, radius) {
+  const x = cx - w / 2;
+  const y = cy - h / 2;
+  const ctx = drawingContext;
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(x, y, w, h, radius);
+  } else {
+    const r = min(radius, w / 2, h / 2);
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+  ctx.clip();
+}
+
+function drawImageCover(img, cx, cy, boxW, boxH) {
+  const scale = max(boxW / img.width, boxH / img.height);
+  const dw = img.width * scale;
+  const dh = img.height * scale;
+  imageMode(CENTER);
+  image(img, cx, cy, dw, dh);
+}
+
+function drawLocationImageTile(tile) {
+  const radius = LOCATION_TILE_RADIUS;
+  const img = locationMenuImages[tile.index];
+  const state = locationMenuLoadState[tile.index];
+
+  push();
+  clipRoundedRect(tile.x, tile.y, tile.w, tile.h, radius);
+
+  if (imageIsDrawable(img)) {
+    drawImageCover(img, tile.x, tile.y, tile.w, tile.h);
+  } else {
+    fill(35);
+    noStroke();
+    rectMode(CENTER);
+    rect(tile.x, tile.y, tile.w, tile.h);
+    if (state === 'loading') {
+      fill(200);
+      textAlign(CENTER, CENTER);
+      textSize(min(26, tile.w / 18));
+      text('LOADING…', tile.x, tile.y);
+    } else if (state === 'unavailable') {
+      fill(90);
+      textAlign(CENTER, CENTER);
+      textSize(min(26, tile.w / 16));
+      text(`LOCATION ${tile.index + 1}`, tile.x, tile.y - 10);
+      textSize(min(20, tile.w / 22));
+      fill(70);
+      text(`Add ${String(tile.index + 1).padStart(4, '0')}_Menu.jpg`, tile.x, tile.y + 16);
+    } else {
+      fill(80);
+      textAlign(CENTER, CENTER);
+      textSize(min(26, tile.w / 16));
+      text(`LOCATION ${tile.index + 1}`, tile.x, tile.y);
+    }
+  }
+  pop();
+
+  noFill();
+  stroke(45);
+  strokeWeight(2);
+  rectMode(CENTER);
+  rect(tile.x, tile.y, tile.w, tile.h, radius);
+  noStroke();
+}
+
+function imageIsDrawable(img) {
+  return img && typeof img.width === 'number' && img.width > 0;
 }
 
 function drawLocationSelect() {
+  loadLocationMenuImages();
+
   background(0);
   drawBrandingHeader();
 
   fill(255);
   textAlign(CENTER, TOP);
   textSize(min(40, width / 26));
-  text('Choose a location', width / 2, height * 0.26);
+  text('Choose a location', width / 2, height * 0.2);
 
   if (loadingErrorMessage) {
     fill(220, 100, 80);
     textSize(min(26, width / 36));
-    text(loadingErrorMessage, width / 2, height * 0.34);
+    text(loadingErrorMessage, width / 2, height * 0.27);
   }
 
-  drawButtonRow(layoutLocationButtons());
+  const { tiles, stackBottom } = layoutLocationImageStack();
+  tiles.forEach(drawLocationImageTile);
+  drawButtonRow([layoutLocationBackButton(stackBottom)]);
 }
 
 function drawLoadingState() {
@@ -475,14 +710,14 @@ function drawImageExhibit() {
       IMAGE_EXHIBIT_BACK_BUTTON_MS,
       MENU_FADE_MS
     );
-    const bw = min(360, width * 0.45);
-    const bh = min(72, height * 0.08);
+    const bw = min(480, width * 0.75);
+    const bh = min(88, height * 0.1);
     drawButtonRow(
       [
         {
           text: 'Back to Menu',
-          x: width - 24 - bw / 2,
-          y: height - min(80, height * 0.1),
+          x: width / 2,
+          y: height - min(100, height * 0.12),
           w: bw,
           h: bh,
           action: 'back_menu_exhibit'
@@ -541,19 +776,20 @@ function drawButtonRow(buttons, alpha = 255) {
     rect(button.x, button.y, button.w, button.h, 10);
     fill(255, alpha);
     textAlign(CENTER, CENTER);
+    const label = (button.text || '').toUpperCase();
     const size = button.wrap
       ? min(26, button.w / 34)
       : min(44, button.h * 0.42);
     textSize(size);
     if (button.wrap) {
-      const lines = wrapButtonLines(button.text, button.w - 32, size);
+      const lines = wrapButtonLines(label, button.w - 32, size);
       const lh = size * 1.25;
       const startY = button.y - ((lines.length - 1) * lh) / 2;
       lines.forEach((ln, i) => {
         text(ln, button.x, startY + i * lh);
       });
     } else {
-      text(button.text, button.x, button.y);
+      text(label, button.x, button.y);
     }
   });
 }
@@ -709,15 +945,17 @@ function handleMenuInput() {
   }
 
   if (currentState === STATES.LOCATION_SELECT) {
-    layoutLocationButtons().forEach((b) => {
-      if (!hitRect(mx, my, b)) return;
-      if (b.action === 'back_menu') {
-        emitIdleToDisplays();
-        currentState = STATES.MAIN_MENU;
-        bumpInteraction();
-      } else if (typeof b.index === 'number') {
-        tryStartLoad('photo_selection', pathsForLocation(b.index));
-      }
+    const { tiles, stackBottom } = layoutLocationImageStack();
+    const back = layoutLocationBackButton(stackBottom);
+    if (hitRect(mx, my, back)) {
+      emitIdleToDisplays();
+      currentState = STATES.MAIN_MENU;
+      bumpInteraction();
+      return;
+    }
+    tiles.forEach((tile) => {
+      if (!hitRect(mx, my, tile)) return;
+      tryStartLoad('photo_selection', pathsForLocation(tile.index));
     });
     return;
   }
@@ -740,10 +978,10 @@ function handleMenuInput() {
 
   if (currentState === STATES.IMAGE_EXHIBIT) {
     if (millis() - imageExhibitStartMs > IMAGE_EXHIBIT_BACK_BUTTON_MS) {
-      const bw = min(360, width * 0.45);
-      const bh = min(72, height * 0.08);
-      const bx = width - 24 - bw / 2;
-      const by = height - min(80, height * 0.1);
+      const bw = min(480, width * 0.75);
+      const bh = min(88, height * 0.1);
+      const bx = width / 2;
+      const by = height - min(100, height * 0.12);
       if (
         mx > bx - bw / 2 &&
         mx < bx + bw / 2 &&

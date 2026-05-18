@@ -23,7 +23,7 @@ const assetManifestPath = path.join(__dirname, '../assets/asset-manifest.json');
 /** Single source of truth for triptych paths (menu reads via GET) */
 app.get('/api/asset-manifest', (req, res) => {
   if (!fs.existsSync(assetManifestPath)) {
-    return res.status(200).json({ locations: {}, choices: {} });
+    return res.status(200).json({ fonts: {}, locations: {}, choices: {} });
   }
   res.sendFile(assetManifestPath);
 });
