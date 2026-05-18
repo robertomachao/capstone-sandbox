@@ -160,6 +160,8 @@ const IMAGE_EXHIBIT_LINES = [
   'Your choice is on the walls.',
   'Take a moment to look around.'
 ];
+/** Multiplier on base line height between consecutive exhibit lines */
+const IMAGE_EXHIBIT_LINE_LEADING = 1.55;
 
 /** Photo selection — edit labels anytime */
 const CHOICE_LABELS = {
@@ -542,7 +544,7 @@ function drawLocationImageTile(tile) {
       fill(200);
       textAlign(CENTER, CENTER);
       textSize(min(26, tile.w / 18));
-      text('LOADING…', tile.x, tile.y);
+      text('SOON...', tile.x, tile.y);
     } else if (state === 'unavailable') {
       fill(90);
       textAlign(CENTER, CENTER);
@@ -616,7 +618,7 @@ function drawLoadingState() {
   fill(255);
   textAlign(CENTER, CENTER);
   textSize(min(52, width / 24));
-  text('Loading...', width / 2, height / 2 + 120);
+  text('SOON...', width / 2, height / 2 + 120);
 
   const readyLine = `Ready: ${loadProgress.screen2 ? 'L✓' : 'L…'} ${loadProgress.screen3 ? 'M✓' : 'M…'} ${loadProgress.screen4 ? 'R✓' : 'R…'}`;
   fill(200);
@@ -634,59 +636,117 @@ function drawLoadingState() {
   }
 }
 
-function layoutPhotoSelectionButtons() {
+/** Title, optional error, and three buttons — vertically equal gaps inside the content band */
+function layoutPhotoSelectionScreen() {
   const bw = min(1100, width * 0.9);
+  const cx = width / 2;
   const backBh = min(88, height * 0.095);
   const choiceBh = min(120, height * 0.13);
-  const cx = width / 2;
-  const gap = 16;
-  const top = height * 0.36;
-  return [
-    {
-      text: 'Back to Menu',
-      x: cx,
-      y: top,
-      w: bw,
-      h: backBh,
-      action: 'back_main'
-    },
-    {
-      text: CHOICE_LABELS[1],
-      x: cx,
-      y: top + backBh + gap,
-      w: bw,
-      h: choiceBh,
-      action: 'choice1',
-      wrap: true
-    },
-    {
-      text: CHOICE_LABELS[2],
-      x: cx,
-      y: top + backBh + gap + choiceBh + gap,
-      w: bw,
-      h: choiceBh,
-      action: 'choice2',
-      wrap: true
-    }
-  ];
+  const titleTs = min(38, width / 28);
+  const titleBlockH = titleTs * 1.35;
+  const errTs = min(26, width / 36);
+  const lineGap = errTs * 1.35;
+
+  let errLines = [];
+  if (loadingErrorMessage) {
+    errLines = wrapButtonLines(loadingErrorMessage, bw - 48, errTs);
+  }
+  const errBlockH =
+    errLines.length > 0 ? errLines.length * lineGap + errTs * 0.25 : 0;
+
+  const blockHeights = [titleBlockH];
+  if (errBlockH > 0) {
+    blockHeights.push(errBlockH);
+  }
+  blockHeights.push(backBh, choiceBh, choiceBh);
+
+  const sumBlocks = blockHeights.reduce((a, b) => a + b, 0);
+  const nGap = blockHeights.length + 1;
+  const regionTop = min(92, height * 0.11);
+  const regionBottom = height - min(92, height * 0.1);
+  const usable = regionBottom - regionTop - sumBlocks;
+  let gap = usable / nGap;
+  gap = max(12, gap);
+
+  let y = regionTop + gap;
+  const titleY = y;
+  y += titleBlockH + gap;
+
+  let errorY = null;
+  if (errLines.length > 0) {
+    errorY = y;
+    y += errBlockH + gap;
+  }
+
+  const backCy = y + backBh / 2;
+  y += backBh + gap;
+  const choice1Cy = y + choiceBh / 2;
+  y += choiceBh + gap;
+  const choice2Cy = y + choiceBh / 2;
+
+  return {
+    cx,
+    titleY,
+    titleTs,
+    errorY,
+    errTs,
+    errLines,
+    lineGap,
+    buttons: [
+      {
+        text: 'Back to Menu',
+        x: cx,
+        y: backCy,
+        w: bw,
+        h: backBh,
+        action: 'back_main'
+      },
+      {
+        text: CHOICE_LABELS[1],
+        x: cx,
+        y: choice1Cy,
+        w: bw,
+        h: choiceBh,
+        action: 'choice1',
+        wrap: true
+      },
+      {
+        text: CHOICE_LABELS[2],
+        x: cx,
+        y: choice2Cy,
+        w: bw,
+        h: choiceBh,
+        action: 'choice2',
+        wrap: true
+      }
+    ]
+  };
 }
 
 function drawPhotoSelection() {
   background(0);
   drawBrandingHeader();
 
+  const lay = layoutPhotoSelectionScreen();
+
   fill(255);
   textAlign(CENTER, TOP);
-  textSize(min(38, width / 28));
-  text('Make a choice', width / 2, height * 0.26);
+  textSize(lay.titleTs);
+  text('Make a choice', lay.cx, lay.titleY);
 
-  if (loadingErrorMessage) {
+  if (lay.errLines.length > 0) {
     fill(220, 100, 80);
-    textSize(min(26, width / 36));
-    text(loadingErrorMessage, width / 2, height * 0.34);
+    textAlign(CENTER, TOP);
+    textSize(lay.errTs);
+    let ey = lay.errorY;
+    lay.errLines.forEach((ln) => {
+      text(ln, lay.cx, ey);
+      ey += lay.lineGap;
+    });
   }
 
-  drawButtonRow(layoutPhotoSelectionButtons());
+  fill(255);
+  drawButtonRow(lay.buttons);
 }
 
 function drawImageExhibit() {
@@ -701,7 +761,7 @@ function drawImageExhibit() {
   const lh = min(58, height / 20);
   IMAGE_EXHIBIT_LINES.forEach((line) => {
     text(line, width / 2, y);
-    y += lh;
+    y += lh * IMAGE_EXHIBIT_LINE_LEADING;
   });
 
   if (elapsed > IMAGE_EXHIBIT_BACK_BUTTON_MS) {
@@ -961,7 +1021,7 @@ function handleMenuInput() {
   }
 
   if (currentState === STATES.PHOTO_SELECTION) {
-    layoutPhotoSelectionButtons().forEach((b) => {
+    layoutPhotoSelectionScreen().buttons.forEach((b) => {
       if (!hitRect(mx, my, b)) return;
       if (b.action === 'back_main') {
         emitIdleToDisplays();

@@ -180,7 +180,7 @@ function drawPreloadingState() {
   fill(255);
   textAlign(CENTER, CENTER);
   textSize(64);
-  text('Loading…', width / 2, height / 2 - 40);
+  text('SOON...', width / 2, height / 2 - 40);
   textSize(28);
   if (currentAsset) {
     text(currentAsset, width / 2, height / 2 + 50);
